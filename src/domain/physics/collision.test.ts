@@ -39,6 +39,14 @@ describe("analyseCollision", () => {
     expect(r.warnings).toEqual([]);
   });
 
+  it("finds contact between frames without a false 'tracks jump' warning", () => {
+    // Contact at 1.508 s falls between 60 fps frames (1.5 and 1.5167 s).
+    const { a, b } = collision({ a: [300, -200], b: [-200, 300] }, { tHit: 1.508, noisePx: 0.3 });
+    const r = analyseCollision(a, b, { massA: 1, massB: 1 });
+    expect(r.contactT).toBeCloseTo(1.508, 2);
+    expect(r.warnings).toEqual([]);
+  });
+
   it("finds restitution 0 when the objects stick, with unequal masses", () => {
     // 0.3 kg at 200 px/s hits 0.1 kg at rest; together they move at 150 px/s.
     const { a, b } = collision({ a: [200, 150], b: [0, 150] });
@@ -105,7 +113,8 @@ describe("analyseCollision", () => {
     const frameTimes = Array.from({ length: 120 }, (_, i) => i / tr.fps);
     const [a, b] = tracksFromRecords(records, { frameTimes, width: 1280, height: 720 });
     const r = analyseCollision(a!, b!, { massA: 1, massB: 1 });
-    expect(Math.abs(r.contactT - tr.collision.tHit)).toBeLessThan(0.05);
+    expect(Math.abs(r.contactT - tr.collision.tHit)).toBeLessThan(0.005);
+    expect(r.warnings).toEqual([]);
     for (const m of [r.momentumRatio, r.restitution]) {
       expect(Math.abs(m.value - 1)).toBeLessThan(0.02);
       expect(Math.abs(m.value - 1)).toBeLessThan(4 * m.se + 0.002);

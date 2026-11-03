@@ -33,8 +33,17 @@ export type PendulumResult = {
   cycles: number;
   fitRmsDeg: number;
   g?: Measured;
+  /** For plotting: the measured angle (rad) per sample and the fitted curve's parameters (see `angleAt`). */
+  series: { t: number[]; theta: number[] };
+  angleFit: AngleFit;
   warnings: string[];
 };
+
+/** θ(t) = a·e^(−γ·(t − t0))·cos(ω·(t − t0) + φ) + c */
+export type AngleFit = { a: number; gamma: number; omega: number; phi: number; c: number; t0: number };
+
+export const angleAt = (f: AngleFit, t: number) =>
+  f.a * Math.exp(-f.gamma * (t - f.t0)) * Math.cos(f.omega * (t - f.t0) + f.phi) + f.c;
 
 const deg = (rad: number) => (rad * 180) / Math.PI;
 
@@ -101,7 +110,7 @@ export function analysePendulum(track: Track, opts: PendulumOptions = {}): Pendu
   const fit = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2]
     .map((phi) => levenbergMarquardt(model, ts, theta, [amp0, 0, omega0, phi, mean]))
     .reduce((best, f) => (f.rms < best.rms ? f : best));
-  const [a, gamma, omega] = fit.params as [number, number, number, number, number];
+  const [a, gamma, omega, phi, c] = fit.params as [number, number, number, number, number];
   const omegaSe = fit.stdErrors[2]!;
 
   // Undamped angular frequency, then the amplitude correction at the mean amplitude over the clip.
@@ -131,6 +140,8 @@ export function analysePendulum(track: Track, opts: PendulumOptions = {}): Pendu
     dampingPerS: gamma,
     cycles,
     fitRmsDeg: deg(fit.rms),
+    series: { t: ts, theta },
+    angleFit: { a, gamma, omega, phi, c, t0 },
     warnings,
   };
 

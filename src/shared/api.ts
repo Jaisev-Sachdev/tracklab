@@ -93,6 +93,16 @@ export type AgentItem = z.infer<typeof AgentItem>;
 export const AgentStepRequest = z.object({ input: z.array(AgentItem).min(1).max(MAX_AGENT_ITEMS) });
 export type AgentStepRequest = z.infer<typeof AgentStepRequest>;
 
+/** A bundled sample as the browser sees it. */
+export type SampleInfo = {
+  id: string;
+  title: string;
+  description: string;
+  video: string;
+  /** Concept prompts with saved SAM output, which replay without a demo code. */
+  cachedPrompts: string[];
+};
+
 /** Header carrying the demo code that unlocks live (billed) calls. */
 export const DEMO_CODE_HEADER = "x-demo-code";
 

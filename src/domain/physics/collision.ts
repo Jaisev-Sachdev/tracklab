@@ -30,10 +30,17 @@ export type CollisionResult = {
   restitution: Measured;
   /** Kinetic energy after / before. */
   energyRatio: Measured;
+  /**
+   * For plotting, in pixels along `axis`: each object's positions and its fitted lines (position = slope·t +
+   * intercept), already corrected for any id swap. The lines apply over `[from, to]`.
+   */
+  series: { a: Point[]; b: Point[] };
+  lines: { a: PlotLine[]; b: PlotLine[] };
   warnings: string[];
 };
 
-type Point = { t: number; s: number };
+export type Point = { t: number; s: number };
+export type PlotLine = { slope: number; intercept: number; from: number; to: number };
 
 /** Principal direction of a point cloud (largest-variance eigenvector of the 2×2 covariance). */
 function principalAxis(points: readonly { x: number; y: number }[]): { x: number; y: number } {
@@ -140,15 +147,38 @@ export function analyseCollision(a: Track, b: Track, opts: CollisionOptions): Co
 
   // Each object's path should be continuous through contact. If the "after" lines join up better swapped, SAM
   // swapped the ids at contact: swap them back rather than report a confident nonsense restitution of about -1.
+  // The breakpoint sits on a frame, up to one frame from the true contact, so continuous paths still differ there by
+  // about |Δv|·Δt. Allow two frames of that, plus a few pixels of tracking noise.
   const gap = (x: LineFit, y: LineFit) => Math.abs(at(x, contactT) - at(y, contactT));
+  const steps = pa.slice(1).map((p, i) => p.t - pa[i]!.t);
+  const dt = steps.sort((x, y) => x - y)[steps.length >> 1] ?? 0;
+  const tolerance = 10 + 2 * dt * (Math.abs(aAfter.slope - aBefore.slope) + Math.abs(bAfter.slope - bBefore.slope));
   const straight = gap(aBefore, aAfter) + gap(bBefore, bAfter);
   const swapped = gap(aBefore, bAfter) + gap(bBefore, aAfter);
-  if (straight > Math.max(10, 3 * swapped)) {
+  const idsSwapped = straight > tolerance && straight > 3 * swapped;
+  if (idsSwapped) {
     [aAfter, bAfter] = [bAfter, aAfter];
     warnings.push("The tracker swapped the two objects' ids at contact; Tracklab swapped them back.");
-  } else if (straight > 20) {
+  } else if (straight > tolerance) {
     warnings.push(`The tracks jump by ${straight.toFixed(0)} px at contact; check the tracking around the collision.`);
   }
+
+  // Refine contact between frames: where each object's before and after lines cross, weighted by how much its
+  // velocity changed (an object that barely changes gives a poorly defined crossing).
+  let weight = 0;
+  let sum = 0;
+  for (const [before, after] of [
+    [aBefore, aAfter],
+    [bBefore, bAfter],
+  ] as const) {
+    const dv = after.slope - before.slope;
+    if (Math.abs(dv) < 1e-9) continue;
+    const t = (before.intercept - after.intercept) / dv;
+    if (Math.abs(t - contactT) > exclude) continue;
+    weight += Math.abs(dv);
+    sum += Math.abs(dv) * t;
+  }
+  const contact = weight > 0 ? sum / weight : contactT;
 
   // A collision changes at least one velocity; without that, the "contact" found is just noise on straight motion.
   const changed = (x: LineFit, y: LineFit) =>
@@ -200,9 +230,19 @@ export function analyseCollision(a: Track, b: Track, opts: CollisionOptions): Co
     }
   }
 
+  const t0 = contact;
+  const splice = (before: Point[], after: Point[]): Point[] => [
+    ...before.filter((p) => p.t < t0),
+    ...after.filter((p) => p.t >= t0),
+  ];
+  const plotLine = (f: LineFit, before: boolean): PlotLine => {
+    const [from, to] = before ? [t0 - exclude - span, t0] : [t0, t0 + exclude + span];
+    return { slope: f.slope, intercept: f.intercept, from, to };
+  };
+
   return {
     objectIds: [a.objectId, b.objectId],
-    contactT,
+    contactT: contact,
     axis,
     unit: opts.calibration ? "m/s" : "px/s",
     velocities: {
@@ -214,6 +254,11 @@ export function analyseCollision(a: Track, b: Track, opts: CollisionOptions): Co
     momentumRatio: ratio(pAfter, pBefore),
     restitution,
     energyRatio: ratio(kinetic(va.after, vb.after), kinetic(va.before, vb.before)),
+    series: idsSwapped ? { a: splice(pa, pb), b: splice(pb, pa) } : { a: pa, b: pb },
+    lines: {
+      a: [plotLine(aBefore, true), plotLine(aAfter, false)],
+      b: [plotLine(bBefore, true), plotLine(bAfter, false)],
+    },
     warnings,
   };
 }
