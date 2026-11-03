@@ -113,7 +113,8 @@ export function analysePendulum(track: Track, opts: PendulumOptions = {}): Pendu
       : Math.abs(a);
   const correction = (meanAmp * meanAmp) / 16;
   const period = (2 * Math.PI) / omegaNat;
-  const periodSe = (period * omegaSe) / omega;
+  // ω and −ω describe the same cosine, so use |ω|.
+  const periodSe = (period * omegaSe) / Math.abs(omega);
   const small = period / (1 + correction);
   const smallSe = periodSe / (1 + correction);
   const cycles = duration / period;

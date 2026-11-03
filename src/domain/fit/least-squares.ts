@@ -106,7 +106,8 @@ export type LineFit = {
 /** Ordinary least-squares straight line y = slope·x + intercept. */
 export function fitLine(xs: readonly number[], ys: readonly number[]): LineFit {
   const n = xs.length;
-  if (n < 2) throw new Error("fitLine needs at least 2 points");
+  // Two points fit exactly and leave no residual to estimate the errors from.
+  if (n < 3) throw new Error("fitLine needs at least 3 points");
   const mx = xs.reduce((s, v) => s + v, 0) / n;
   const my = ys.reduce((s, v) => s + v, 0) / n;
   let sxx = 0;

@@ -1,0 +1,29 @@
+[
+  {
+    "id": "pendulum-synthetic",
+    "title": "Synthetic pendulum",
+    "description": "Rendered 0.5 m pendulum at a 10° swing, so the true g is known (9.81). The pivot is the black square; the bar at the bottom is 0.5 m.",
+    "video": "/samples/pendulum-synthetic.mp4",
+    "width": 1280,
+    "height": 720,
+    "fps": 30,
+    "frames": 300,
+    "cached": {
+      "concept:red ball": "pendulum-synthetic.red-ball.txt",
+      "concept:circle": "pendulum-synthetic.circle.txt"
+    }
+  },
+  {
+    "id": "collision-synthetic",
+    "title": "Synthetic collision",
+    "description": "Two equal balls in a perfectly elastic collision, so momentum and kinetic energy are both conserved.",
+    "video": "/samples/collision-synthetic.mp4",
+    "width": 1280,
+    "height": 720,
+    "fps": 30,
+    "frames": 120,
+    "cached": {
+      "concept:blue ball": "collision-synthetic.blue-ball.txt"
+    }
+  }
+]

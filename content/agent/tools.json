@@ -1,0 +1,176 @@
+[
+  {
+    "type": "function",
+    "name": "get_frames",
+    "description": "Look at up to 4 frames of the video, scaled to 640 px wide. With overlay true, tracked objects are drawn with their ids, plus the pivot and calibration line if set. Coordinates you read off a frame are in source pixels; each image says its source size.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "times_s": { "type": "array", "items": { "type": "number", "minimum": 0 }, "minItems": 1, "maxItems": 4 },
+        "overlay": { "type": "boolean" }
+      },
+      "required": ["times_s", "overlay"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "type": "function",
+    "name": "track",
+    "description": "Track every instance of a concept through the whole video with SAM 3.1. The prompt must be a short noun phrase (e.g. 'red ball', 'toy car'), never a sentence. Returns per object: id, frames tracked out of total, frames cut off by the edge, longest gap, and start/end positions. Replaces any previous tracking. Concept prompts sometimes find nothing on video even when the object is plainly visible: if so, try another phrase, then track_boxes.",
+    "parameters": {
+      "type": "object",
+      "properties": { "prompt": { "type": "string", "minLength": 1, "maxLength": 60 } },
+      "required": ["prompt"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "type": "function",
+    "name": "track_boxes",
+    "description": "Track specific objects through the whole video from boxes drawn on one frame (source pixels). This is reliable when concept prompts fail. Get boxes from locate. Replaces any previous tracking.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "time_s": { "type": "number", "minimum": 0 },
+        "boxes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "integer", "minimum": 0, "maximum": 15 },
+              "x1": { "type": "number" },
+              "y1": { "type": "number" },
+              "x2": { "type": "number" },
+              "y2": { "type": "number" }
+            },
+            "required": ["id", "x1", "y1", "x2", "y2"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["time_s", "boxes"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "type": "function",
+    "name": "locate",
+    "description": "Find a concept in one frame with SAM 3.1 (still image, more reliable than video). Returns each match's box and centre in source pixels. Use it for the pivot or clamp, a ruler or reference object, or to get boxes for track_boxes.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "time_s": { "type": "number", "minimum": 0 },
+        "prompt": { "type": "string", "minLength": 1, "maxLength": 60 }
+      },
+      "required": ["time_s", "prompt"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "type": "function",
+    "name": "set_pivot",
+    "description": "Set the pendulum's pivot point in source pixels, e.g. the centre of the clamp found with locate, or the bottom of the string's fixing point.",
+    "parameters": {
+      "type": "object",
+      "properties": { "x": { "type": "number" }, "y": { "type": "number" } },
+      "required": ["x", "y"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "type": "function",
+    "name": "set_calibration",
+    "description": "Set the length scale from a straight line across a reference object of known length (source pixels), e.g. the two ends of a ruler found with locate. Put the reference in the same plane as the motion.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "x1": { "type": "number" },
+        "y1": { "type": "number" },
+        "x2": { "type": "number" },
+        "y2": { "type": "number" },
+        "length_m": { "type": "number", "exclusiveMinimum": 0 }
+      },
+      "required": ["x1", "y1", "x2", "y2", "length_m"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "type": "function",
+    "name": "ask_user",
+    "description": "Ask the person something only they can answer: a measured length or mass, which object is which, or to click a point (pivot) or two points (calibration line) on a frame. Keep it to one short question.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "question": { "type": "string", "maxLength": 300 },
+        "answer_type": { "type": "string", "enum": ["number", "text", "click_point", "click_line"] },
+        "unit": { "type": "string", "description": "For numbers, e.g. 'm' or 'kg'." },
+        "time_s": { "type": "number", "minimum": 0, "description": "For clicks: the frame to show." }
+      },
+      "required": ["question", "answer_type"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "type": "function",
+    "name": "analyse_pendulum",
+    "description": "Fit the tracked bob's swing: period (damping separated), amplitude correction, and g with its uncertainty. g needs either a pivot (set_pivot) plus calibration, or a measured pivot-to-bob-centre length. Returns numbers and warnings.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "object_id": { "type": "string" },
+        "measured_length_m": { "type": "number", "exclusiveMinimum": 0 },
+        "measured_length_se_m": { "type": "number", "minimum": 0 }
+      },
+      "required": ["object_id"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "type": "function",
+    "name": "analyse_collision",
+    "description": "Fit velocities just before and after the collision of two tracked objects along their line of motion, then momentum before/after, restitution and kinetic-energy ratio. Ratios need only the masses, not a length scale.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "object_a": { "type": "string" },
+        "object_b": { "type": "string" },
+        "mass_a_kg": { "type": "number", "exclusiveMinimum": 0 },
+        "mass_b_kg": { "type": "number", "exclusiveMinimum": 0 }
+      },
+      "required": ["object_a", "object_b", "mass_a_kg", "mass_b_kg"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "type": "function",
+    "name": "finish",
+    "description": "End the analysis with the lab report. Every number must come from a tool result in this conversation.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "experiment": { "type": "string", "enum": ["pendulum", "collision", "other"] },
+        "headline": {
+          "type": "string",
+          "maxLength": 160,
+          "description": "The main result with its uncertainty, e.g. 'g = 9.79 ± 0.04 m/s²'."
+        },
+        "summary": { "type": "string", "maxLength": 1200, "description": "What was measured and how, in plain words." },
+        "comparison": {
+          "type": "string",
+          "maxLength": 400,
+          "description": "Against the accepted or expected value, in standard errors."
+        },
+        "setup_issues": { "type": "array", "items": { "type": "string", "maxLength": 300 }, "maxItems": 5 },
+        "next_trial": {
+          "type": "string",
+          "maxLength": 400,
+          "description": "One concrete change for the next run and why."
+        }
+      },
+      "required": ["experiment", "headline", "summary", "comparison", "setup_issues", "next_trial"],
+      "additionalProperties": false
+    }
+  }
+]

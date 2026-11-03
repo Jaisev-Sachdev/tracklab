@@ -6,10 +6,12 @@ export type Matrix = number[][];
 export function solve(a: Matrix, b: number[]): number[] | undefined {
   const n = b.length;
   const m = a.map((row, i) => [...row, b[i]!]);
+  // Singular relative to the matrix's size, so roundoff on a nearly singular system isn't mistaken for a solution.
+  const tiny = 1e-12 * Math.max(...a.flat().map(Math.abs), Number.MIN_VALUE);
   for (let col = 0; col < n; col++) {
     let pivot = col;
     for (let r = col + 1; r < n; r++) if (Math.abs(m[r]![col]!) > Math.abs(m[pivot]![col]!)) pivot = r;
-    if (Math.abs(m[pivot]![col]!) < 1e-300) return undefined;
+    if (Math.abs(m[pivot]![col]!) <= tiny) return undefined;
     [m[col], m[pivot]] = [m[pivot]!, m[col]!];
     const p = m[col]!;
     for (let r = 0; r < n; r++) {

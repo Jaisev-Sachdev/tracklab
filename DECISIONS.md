@@ -73,3 +73,54 @@ tape-measured length; collision momentum ratio 0.998 ± 0.013 and restitution 1.
 execution; GHSA-p3m5-59mp-jv5r: denial of service).
 **Decision:** Pin next and eslint-config-next to 16.4.4.
 **Consequence:** `npm audit --omit=dev` is clean.
+
+## D-007 Live calls need a demo code; bundled samples replay for free (2026-11-03)
+
+**Context:** The app will be public for judging. Every live call (SAM, Muse Spark, uploads) is billed to one personal
+account, and an open agent route would be a free model proxy.
+**Decision:** Live routes require a code from `DEMO_CODES` in the `x-demo-code` header (constant-time compare). With no
+codes configured, development is open and production is closed. Saved SAM output for the bundled samples replays
+through the same streaming route without a code (`npm run cache:sample`). Uploads go browser → Vercel Blob directly
+with a token issued only for a code, MP4/MOV only, 150 MB max, and SAM only accepts our Blob store's URLs.
+**Consequence:** Judges get the code in the submission form; anyone else can still watch the samples. Meta's spend
+alert stays the backstop. No per-code rate limit yet.
+
+## D-008 The browser runs the agent loop; the server fixes the model, instructions and tools (2026-11-03)
+
+**Context:** The tools need the video, the tracks and the user (clicks, measured lengths), which all live in the
+browser. Serverless functions shouldn't hold a long agent loop.
+**Decision:** `/api/agent/step` runs one stateless Muse Spark call (`store: false`) on the conversation the browser
+sends. The server adds the model, `content/agent/instructions.md` and `content/agent/tools.json`, and rejects system
+or developer messages and more than 24 images. Frames go at 640 px wide to stay under Vercel's 4.5 MB body limit.
+**Consequence:** Each step is short (about 3 s in the smoke test). The conversation is resent each step, so long runs
+cost more input tokens; capped by 14 tool calls in the instructions and 160 items in the schema.
+
+## D-009 Fixes from an independent review of steps 1 and 2 (2026-11-03)
+
+**Context:** Two reviewers read the physics core and the server separately, without our conclusions, and reproduced
+their findings with probes.
+**Decision:** Fixed:
+
+- Collision contact time is now the breakpoint where two straight lines (before/after) beat one, across both objects.
+  "First frame near closest approach" was early on slow approaches (restitution 0.909 instead of 1, no warning).
+- Momentum ratio and restitution are computed in pixels, where the length scale cancels; its error now only enters
+  absolute values, as one correlated term. Before, it roughly doubled the ratios' error bars.
+- An id swap at contact is detected from path continuity and undone, with a warning, instead of reporting restitution
+  −1. Negative restitution, a near-zero approach speed and "nothing changed speed" now warn or refuse.
+- Energy ratio has an uncertainty; ratios no longer give NaN when the numerator is zero.
+- The pendulum is now also tested against a numerically integrated nonlinear, damped pendulum (RK4) rather than only
+  against the series formula it inverts: g within 0.3% at 5° and 15°, with and without damping.
+- Singular-matrix detection is relative to the matrix scale; `fitLine` needs 3 points; frame times must increase and
+  frames past the end are an error, not silently dropped.
+- Agent route: conversation items are allowlisted (user/assistant text, inline JPEG/PNG images, calls to our own tools
+  and their outputs); remote image URLs, videos and files are rejected; output is capped at 6,000 tokens per step.
+- Uploads: only this project's Blob store (`BLOB_PUBLIC_HOST`) under `uploads/` is tracked, and the server reads the
+  video's duration from its container (mediabunny, range requests) and refuses anything over `MAX_VIDEO_SECONDS` (60).
+- Object prompts must match `buildObjectPrompt`'s grammar. Request bodies are capped while streaming. The upload route
+  only issues tokens, with fixed error text. `readSse` cancels the stream if the consumer stops early. Preview
+  deployments send sample videos inline (deployment protection would block Meta's fetch).
+- A nested zod 4.1.11 under `@vercel/blob` (advisory GHSA-mrhx-c7xc-m3w5) is overridden to 4.6.6.
+
+**Consequence:** 54 tests. Still open, by choice: no per-code rate limit (use long random demo codes, rotate them,
+and keep Meta's spend alert); the UI must convert pivot clicks to continuous pixel coordinates (pixel i's centre is
+i + 0.5), not the parser README's floored indices, or g picks up about +0.1% bias.

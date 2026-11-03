@@ -35,7 +35,55 @@ function pendulumTrack(opts: {
   return { track: trackFrom("0", points), pivot };
 }
 
+/**
+ * Independent ground truth: integrate the full nonlinear equation θ'' = −(g/L)·sin θ − 2γ·θ' with RK4, so the
+ * amplitude correction and the damping separation are checked against physics, not against the formula they use.
+ */
+function integratedPendulum(opts: { L: number; theta0Deg: number; gamma: number; pxPerM: number; noisePx: number }) {
+  const { L, gamma, pxPerM, noisePx } = opts;
+  const fps = 30;
+  const steps = 40; // RK4 substeps per frame
+  const h = 1 / fps / steps;
+  const f = (th: number, w: number) => [w, -(G / L) * Math.sin(th) - 2 * gamma * w] as const;
+  let th = (opts.theta0Deg * Math.PI) / 180;
+  let w = 0;
+  const noise = gaussian(9);
+  const pivot = { x: 640, y: 60 };
+  const points = [];
+  for (let frame = 0; frame < 12 * fps; frame++) {
+    points.push({
+      frame,
+      t: frame / fps,
+      x: pivot.x + L * pxPerM * Math.sin(th) + noisePx * noise(),
+      y: pivot.y + L * pxPerM * Math.cos(th) + noisePx * noise(),
+    });
+    for (let s = 0; s < steps; s++) {
+      const k1 = f(th, w);
+      const k2 = f(th + (h / 2) * k1[0], w + (h / 2) * k1[1]);
+      const k3 = f(th + (h / 2) * k2[0], w + (h / 2) * k2[1]);
+      const k4 = f(th + h * k3[0], w + h * k3[1]);
+      th += (h / 6) * (k1[0] + 2 * k2[0] + 2 * k3[0] + k4[0]);
+      w += (h / 6) * (k1[1] + 2 * k2[1] + 2 * k3[1] + k4[1]);
+    }
+  }
+  return { track: trackFrom("0", points), pivot };
+}
+
 describe("analysePendulum", () => {
+  it.each([
+    { theta0Deg: 5, gamma: 0 },
+    { theta0Deg: 15, gamma: 0 },
+    { theta0Deg: 15, gamma: 0.06 },
+  ])(
+    "recovers g within 0.3% from an integrated nonlinear pendulum ($theta0Deg°, γ = $gamma)",
+    ({ theta0Deg, gamma }) => {
+      const { track, pivot } = integratedPendulum({ L: 0.6, theta0Deg, gamma, pxPerM: 900, noisePx: 0.7 });
+      const r = analysePendulum(track, { pivot, calibration: { pxPerM: 900, pxPerMSe: 0 } });
+      expect(Math.abs(r.g!.value / G - 1)).toBeLessThan(0.003);
+      expect(Math.abs(r.g!.value - G)).toBeLessThan(4 * r.g!.se);
+    },
+  );
+
   it("recovers g within 0.5% from a noisy calibrated track", () => {
     const { track, pivot } = pendulumTrack({ L: 0.75, theta0Deg: 12, pxPerM: 700, noisePx: 1 });
     const r = analysePendulum(track, { pivot, calibration: { pxPerM: 700, pxPerMSe: 2 } });

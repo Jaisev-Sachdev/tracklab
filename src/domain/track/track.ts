@@ -46,6 +46,9 @@ function maskCentroid(raster: Uint8Array, w: number, h: number, bounds: Box): { 
 
 export function tracksFromRecords(records: readonly SegmentationRecord[], opts: TrackOptions): Track[] {
   const margin = opts.edgeMarginPx ?? 2;
+  for (let i = 1; i < opts.frameTimes.length; i++) {
+    if (!(opts.frameTimes[i]! > opts.frameTimes[i - 1]!)) throw new Error(`Frame times must increase (frame ${i}).`);
+  }
   // One sample per (object, frame); a mask record wins over a bare box record.
   const byObject = new Map<string, Map<number, Sample & { fromMask: boolean }>>();
 
@@ -54,7 +57,7 @@ export function tracksFromRecords(records: readonly SegmentationRecord[], opts: 
     const frame = frameIndexOf(rec);
     if (frame === undefined) continue;
     const t = opts.frameTimes[frame];
-    if (t === undefined) continue;
+    if (t === undefined) throw new Error(`SAM returned frame ${frame}, but the video has ${opts.frameTimes.length}.`);
     const box: Box =
       rec.kind === "mask" ? { ...rec.bounds } : { left: rec.left, top: rec.top, right: rec.right, bottom: rec.bottom };
 
