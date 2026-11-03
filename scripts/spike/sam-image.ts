@@ -10,7 +10,16 @@ for (const prompt of prompts) {
   let text = "";
   for await (const ev of streamResponse({
     model: "sam-3.1",
-    input: [{ type: "message", role: "user", content: [{ type: "input_text", text: prompt }, { type: "input_image", image_url: dataUrl(image, mime) }] }],
+    input: [
+      {
+        type: "message",
+        role: "user",
+        content: [
+          { type: "input_text", text: prompt },
+          { type: "input_image", image_url: dataUrl(image, mime) },
+        ],
+      },
+    ],
   })) {
     if (ev.type === "response.output_text.delta") text += String(ev.delta);
     if (ev.type === "response.output_text.done" && !text) text = String(ev.text ?? "");

@@ -47,7 +47,10 @@ function truthCentres(frame: number): { x: number; y: number }[] {
   const before = t < c.tHit;
   const xa = before ? c.a.x0 + c.a.v * t : c.a.x0 + c.a.v * c.tHit + c.b.v * (t - c.tHit);
   const xb = before ? c.b.x0 + c.b.v * t : c.b.x0 + c.b.v * c.tHit + c.a.v * (t - c.tHit);
-  return [{ x: xa, y: c.y }, { x: xb, y: c.y }];
+  return [
+    { x: xa, y: c.y },
+    { x: xb, y: c.y },
+  ];
 }
 
 const started = Date.now();
@@ -89,7 +92,9 @@ const frames = new Set(recs.map((r) => r.frame));
 const ids = [...new Set(recs.map((r) => r.id))];
 console.log(`Event types: ${events.join(", ")}`);
 console.log(`First line after ${firstLineMs} ms, done after ${Date.now() - started} ms`);
-console.log(`${lines.length} lines, ${frames.size} frames with detections (max frame ${Math.max(...frames)}), object ids: ${ids.join(", ")}`);
+console.log(
+  `${lines.length} lines, ${frames.size} frames with detections (max frame ${Math.max(...frames)}), object ids: ${ids.join(", ")}`,
+);
 console.log("First line (truncated):", lines[0]?.slice(0, 300));
 console.log("Mask token head:", recs[0]?.maskHead);
 

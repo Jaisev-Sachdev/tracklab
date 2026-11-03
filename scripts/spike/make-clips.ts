@@ -86,11 +86,22 @@ writeFileSync(
   JSON.stringify(
     {
       fps: FPS,
-      pendulum: { g: G, pxPerM: PX_PER_M, lengthPx: L_PX, lengthM: L_M, theta0Rad: THETA0, periodS: T, pivot: PIVOT, radiusPx: R },
+      pendulum: {
+        g: G,
+        pxPerM: PX_PER_M,
+        lengthPx: L_PX,
+        lengthM: L_M,
+        theta0Rad: THETA0,
+        periodS: T,
+        pivot: PIVOT,
+        radiusPx: R,
+      },
       collision: { radiusPx: R, y: 360, a: { x0: A0, v: VA }, b: { x0: B0, v: VB }, tHit: T_HIT },
     },
     null,
     2,
   ),
 );
-console.log(`Wrote ${OUT}/pendulum.mp4 (T = ${T.toFixed(5)} s), ${OUT}/collision.mp4 (contact at ${T_HIT.toFixed(3)} s), ${OUT}/truth.json`);
+console.log(
+  `Wrote ${OUT}/pendulum.mp4 (T = ${T.toFixed(5)} s), ${OUT}/collision.mp4 (contact at ${T_HIT.toFixed(3)} s), ${OUT}/truth.json`,
+);

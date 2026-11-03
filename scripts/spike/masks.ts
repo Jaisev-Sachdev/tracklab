@@ -1,7 +1,13 @@
 // Spike: decode saved SAM output with @meta-sam/parser and compare mask centroids with box centres and truth.
 // Usage: tsx scripts/spike/masks.ts   (reads spike-out/sam-pendulum.txt from the last spike:sam run)
 import { readFileSync } from "node:fs";
-import { decodeMaskToRaster, frameIndexOf, parseVideoStream, recordsOfKind, type ResponsesEvent } from "@meta-sam/parser";
+import {
+  decodeMaskToRaster,
+  frameIndexOf,
+  parseVideoStream,
+  recordsOfKind,
+  type ResponsesEvent,
+} from "@meta-sam/parser";
 
 const text = readFileSync("spike-out/sam-pendulum.txt", "utf8");
 const truth = JSON.parse(readFileSync("spike-out/truth.json", "utf8"));

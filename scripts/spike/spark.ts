@@ -8,7 +8,18 @@ const modelArg = process.argv.indexOf("--model");
 const model = modelArg > -1 ? process.argv[modelArg + 1]! : "muse-spark-1.3";
 const withVideo = process.argv.includes("--video");
 
-spawnSync(ffmpegPath as unknown as string, ["-y", "-loglevel", "error", "-ss", "0.5", "-i", "spike-out/pendulum.mp4", "-frames:v", "1", "spike-out/frame.jpg"]);
+spawnSync(ffmpegPath as unknown as string, [
+  "-y",
+  "-loglevel",
+  "error",
+  "-ss",
+  "0.5",
+  "-i",
+  "spike-out/pendulum.mp4",
+  "-frames:v",
+  "1",
+  "spike-out/frame.jpg",
+]);
 
 const media = withVideo
   ? { type: "input_video", file_id: await uploadFile("spike-out/pendulum.mp4", "video/mp4") }
@@ -21,7 +32,9 @@ const tools = [
     description: "Track objects through the whole video with SAM 3.1. Returns object ids and per-frame boxes.",
     parameters: {
       type: "object",
-      properties: { prompt: { type: "string", description: "Short noun phrase naming the object, e.g. 'pendulum bob'." } },
+      properties: {
+        prompt: { type: "string", description: "Short noun phrase naming the object, e.g. 'pendulum bob'." },
+      },
       required: ["prompt"],
       additionalProperties: false,
     },
@@ -52,7 +65,13 @@ const res = await createResponse({
     {
       type: "message",
       role: "user",
-      content: [{ type: "input_text", text: `Here is ${withVideo ? "the video" : "one frame"} of my experiment. What is it, and what should we track?` }, media],
+      content: [
+        {
+          type: "input_text",
+          text: `Here is ${withVideo ? "the video" : "one frame"} of my experiment. What is it, and what should we track?`,
+        },
+        media,
+      ],
     },
   ],
   tools,

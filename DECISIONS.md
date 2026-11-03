@@ -54,3 +54,22 @@ no diagnostics.
 before writing our own. Pin exact versions.
 **Consequence:** Less code of our own, and the phone-video frame-timing risk is handled by Meta's library. Those
 packages are under the SAM License, not MIT; our code stays MIT and depends on them without vendoring them.
+
+## D-005 g needs a marked pivot or a measured length (2026-11-03)
+
+**Context:** The first plan fitted the pivot from the bob's arc. At a 10° swing the arc bows by only about 6 px over
+400 px, so 1–2 px of tracking bias moves the centre a lot. On SAM's real output for the synthetic clip, the fitted
+length came out 14% long while its error bar claimed about 2%, giving g = 11.17 ± 0.20 instead of 9.81.
+**Decision:** The pivot comes from the user (a click) or from SAM on a still frame, and every frame then measures the
+length directly. A pivot fitted from the arc is still used for angles, since the period hardly depends on it, but never
+for length. Without a marked pivot or a hand-measured length, the analysis gives the period and no g, and says why.
+**Consequence:** One more setup step for the user, which the agent can usually do with a SAM image call. On the same
+SAM output: period 1.42112 s vs 1.42120 s true; g = 9.787 ± 0.037 with the pivot marked and 9.803 ± 0.020 with a
+tape-measured length; collision momentum ratio 0.998 ± 0.013 and restitution 1.001 ± 0.003.
+
+## D-006 Next.js 16.4.4, not 16.4.0 (2026-11-03)
+
+**Context:** `npm audit` flags next 16.0.0–16.4.0 as critical (GHSA-2464-fhr4-w9xw, GHSA-673q-mjm6-r5xr: remote code
+execution; GHSA-p3m5-59mp-jv5r: denial of service).
+**Decision:** Pin next and eslint-config-next to 16.4.4.
+**Consequence:** `npm audit --omit=dev` is clean.

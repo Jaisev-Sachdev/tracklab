@@ -20,7 +20,11 @@ export async function uploadFile(path: string, mime: string): Promise<string> {
   const form = new FormData();
   form.append("purpose", "user_data");
   form.append("file", new Blob([readFileSync(path)], { type: mime }), basename(path));
-  const res = await fetch(`${BASE_URL}/files`, { method: "POST", headers: { Authorization: `Bearer ${apiKey()}` }, body: form });
+  const res = await fetch(`${BASE_URL}/files`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey()}` },
+    body: form,
+  });
   await failOnError(res, "File upload");
   const json = (await res.json()) as { id?: string };
   if (!json.id) throw new Error(`File upload returned no id: ${JSON.stringify(json)}`);
