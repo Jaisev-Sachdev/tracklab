@@ -1,7 +1,7 @@
 [
   {
     "id": "title",
-    "card": ["Tracklab", "Measure physics from any video", "Meta SAM 3.1 + Muse Spark"],
+    "card": ["tracklab", "Film an experiment. Get a measurement you can trust.", "Meta SAM 3.1 + Muse Spark"],
     "text": "This is Tracklab. Film a physics experiment, and a Muse Spark lab partner measures it, with honest error bars."
   },
   {
@@ -12,7 +12,7 @@
   {
     "id": "classroom",
     "clip": "classroom",
-    "text": "Here is real classroom footage of a half-metre pendulum, from Wikimedia Commons. The lab partner looks at the frames first, then asks SAM 3.1 to track the bob. The bob is small and dark, so text prompts miss it. Instead of guessing, the agent asks me for one click. From that single click, SAM 3.1 follows the bob through every frame. Tracklab fits a damped pendulum, corrected for the size of the swing. g comes out at 9.48, three and a half percent low, nearly nine standard errors from 9.81. And the lab partner explains why, using numbers our code computed. 9.81 would need a length one point seven centimetres longer, about the size of the bob. So the half metre was most likely measured to the top of the bob, not its centre. Its advice: measure to the centre next time."
+    "text": "Here is real classroom footage of a half-metre pendulum, from Wikimedia Commons. The lab partner looks at the frames first, then asks SAM 3.1 to track the bob. The bob is small and dark, so text prompts miss it. Instead of guessing, the agent asks me for one click. From that single click, SAM 3.1 follows the bob through every frame. Tracklab fits a damped pendulum, corrected for the size of the swing. g comes out at 9.49, about three percent low, more than eight standard errors from 9.81. And the lab partner explains why, using numbers our code computed. 9.81 would need a length one point seven centimetres longer, about the size of the bob. So the half metre was most likely measured to the top of the bob, not its centre. Its advice: measure to the centre next time."
   },
   {
     "id": "collision",
@@ -43,7 +43,7 @@
   },
   {
     "id": "close",
-    "card": ["Tracklab", "tracklab-olive.vercel.app", "github.com/Jaisev-Sachdev/tracklab"],
+    "card": ["tracklab", "tracklab-olive.vercel.app", "github.com/Jaisev-Sachdev/tracklab"],
     "text": "Tracklab. Point a phone at an experiment, and get a measurement you can trust."
   }
 ]

@@ -7,9 +7,12 @@ import ffmpegPath from "ffmpeg-static";
 
 const OUT = "video-out";
 const FF = ffmpegPath as unknown as string;
-const FONT = "C\\:/Windows/Fonts/segoeui.ttf";
-const BOLD = "C\\:/Windows/Fonts/segoeuib.ttf";
-const BG = "0x141413";
+// The app's own typefaces (Google Fonts, OFL), fetched into video-out/fonts; colours match the dark theme.
+const MONO = "video-out/fonts/JetBrainsMono.ttf";
+const DISPLAY = "video-out/fonts/SpaceGrotesk.ttf";
+const BG = "0x0a0e13";
+const SIGNAL = "0xc8f135";
+const LOGO = "video-out/logo.png";
 const FPS = 30;
 
 type Scene = { id: string; text: string; card?: string[]; clip?: string };
@@ -30,24 +33,35 @@ function duration(file: string): number {
 // drawtext runs with expansion=none, so only its option separators and quotes need escaping.
 const esc = (s: string) => s.replace(/\\/g, "\\\\").replace(/:/g, "\\:").replace(/'/g, "\u2019");
 
-/** A dark card: first line large and bold, the rest smaller, centred as a block. */
-function cardFilter(lines: string[], seconds: number): string {
+/**
+ * A card in the app's style: blueprint grid on ink, the heading in Space Grotesk over a short lime rule, the rest in
+ * JetBrains Mono. With a logo, it sits above the heading. Inputs: [0:v] background, [2:v] logo (if used).
+ */
+function cardFilter(lines: string[], seconds: number, logo: boolean): string {
   const [head, ...rest] = lines;
-  const big = rest.length ? 84 : 110;
-  const total = big + rest.length * 62;
+  // Space Grotesk averages about 0.52 em per character; keep the heading inside ~1700 px.
+  const big = Math.min(rest.length ? 92 : 128, Math.floor(1700 / (head!.length * 0.52)));
+  const logoH = logo ? 170 : 0;
+  const total = logoH + big + 40 + rest.length * 60;
   let y = (1080 - total) / 2;
+  const grid = `drawgrid=w=24:h=24:t=1:c=0x78aadc@0.05,drawgrid=w=120:h=120:t=1:c=0x78aadc@0.06`;
+  const logoY = y;
+  y += logoH;
   const parts = [
-    `drawtext=fontfile='${BOLD}':text='${esc(head!)}':fontsize=${big}:fontcolor=white:expansion=none:x=(w-text_w)/2:y=${y}`,
+    `drawtext=fontfile='${DISPLAY}':text='${esc(head!)}':fontsize=${big}:fontcolor=0xe8edf2:expansion=none:x=(w-text_w)/2:y=${y}`,
   ];
-  y += big + 36;
+  y += big + 18;
+  parts.push(`drawbox=x=(iw-140)/2:y=${y}:w=140:h=5:color=${SIGNAL}:t=fill`);
+  y += 40;
   for (const line of rest) {
     parts.push(
-      `drawtext=fontfile='${FONT}':text='${esc(line)}':fontsize=40:fontcolor=0xc9c7bf:expansion=none:x=(w-text_w)/2:y=${y}`,
+      `drawtext=fontfile='${MONO}':text='${esc(line)}':fontsize=36:fontcolor=0x9aa6b6:expansion=none:x=(w-text_w)/2:y=${y}`,
     );
-    y += 62;
+    y += 60;
   }
-  parts.push(`fade=t=in:st=0:d=0.4,fade=t=out:st=${(seconds - 0.4).toFixed(2)}:d=0.4`);
-  return parts.join(",");
+  const fade = `fade=t=in:st=0:d=0.4,fade=t=out:st=${(seconds - 0.4).toFixed(2)}:d=0.4`;
+  if (!logo) return `[0:v]${grid},${parts.join(",")},${fade}[v]`;
+  return `[0:v]${grid},${parts.join(",")}[base];[2:v]scale=150:150[lg];[base][lg]overlay=x=(W-w)/2:y=${logoY},${fade}[v]`;
 }
 
 /** Trim [a, b) of the recording and play it `speed` times faster. */
@@ -96,14 +110,16 @@ for (const s of scenes) {
   const audioEnc = ["-c:a", "aac", "-b:a", "160k", "-ar", "48000", "-ac", "1"];
   if (s.card) {
     const len = v + 1.4;
+    const logo = s.id === "title" || s.id === "close";
     ff([
       "-f",
       "lavfi",
       "-i",
       `color=c=${BG}:s=1920x1080:r=${FPS}:d=${len.toFixed(2)}`,
       ...audio,
+      ...(logo ? ["-i", LOGO] : []),
       "-filter_complex",
-      `[0:v]${cardFilter(s.card, len)}[v];[1:a]adelay=500|500,apad[a]`,
+      `${cardFilter(s.card, len, logo)};[1:a]adelay=500|500,apad[a]`,
       "-map",
       "[v]",
       "-map",
@@ -122,8 +138,9 @@ for (const s of scenes) {
     filters.push(
       `${plan.map((_, i) => `[p${i}]`).join("")}concat=n=${plan.length}:v=1:a=0,fps=${FPS},` +
         `scale=1920:1080:flags=lanczos,` +
-        `drawbox=x=0:y=0:w=iw:h=58:color=black@0.55:t=fill,` +
-        `drawtext=fontfile='${FONT}':text='${esc(LABELS[s.clip!] ?? "")}':fontsize=30:fontcolor=white:expansion=none:x=28:y=12,` +
+        `drawbox=x=0:y=0:w=iw:h=58:color=0x0a0e13@0.82:t=fill,` +
+        `drawbox=x=28:y=22:w=14:h=14:color=${SIGNAL}:t=fill,` +
+        `drawtext=fontfile='${MONO}':text='${esc(LABELS[s.clip!] ?? "")}':fontsize=26:fontcolor=0xe8edf2:expansion=none:x=56:y=15,` +
         `fade=t=in:st=0:d=0.3,fade=t=out:st=${(len - 0.3).toFixed(2)}:d=0.3[v]`,
       `[1:a]adelay=400|400,apad[a]`,
     );
