@@ -108,7 +108,7 @@ export function Lab({ samples, uploadMode }: { samples: SampleInfo[]; uploadMode
       credit: s.credit,
       creditUrl: s.creditUrl,
     });
-    setPhrase(s.cachedPrompts[0] ?? "");
+    setPhrase(s.suggestedPrompt ?? "");
     setExperiment(s.id.startsWith("collision") ? "collision" : "pendulum");
   }
 
@@ -184,7 +184,11 @@ export function Lab({ samples, uploadMode }: { samples: SampleInfo[]; uploadMode
     setError(undefined);
     try {
       const found = await track({ kind: "concept", phrase: phrase.trim() }, ctrl.signal);
-      if (found.length === 0) setError(`SAM found no "${phrase.trim()}" in the video. Try another short phrase.`);
+      if (found.length === 0)
+        setError(
+          `SAM found no "${phrase.trim()}" in the video. Text prompts sometimes miss objects on video even when they are ` +
+            `plainly visible: try another short phrase (e.g. "circle"), or let the lab partner track it with a box.`,
+        );
     } catch (e) {
       if (!ctrl.signal.aborted) setError(e instanceof Error ? e.message : String(e));
     }

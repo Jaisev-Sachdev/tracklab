@@ -8,7 +8,7 @@ import { z } from "zod";
 import { AgentStepRequest } from "@/shared/api";
 import { readBody, readTextCapped } from "./http";
 import { canServeToMeta, checkVideoLength, isOurUpload, samRequestBody, videoInput } from "./sam";
-import { cachedOutput, findSample, promptKey, samples } from "./samples";
+import { cachedOutput, findSample, promptKey, samples, workingConceptPrompts } from "./samples";
 
 function setEnv(vars: Record<string, string | undefined>) {
   for (const [k, v] of Object.entries(vars)) vi.stubEnv(k, v as string);
@@ -218,5 +218,13 @@ describe("agent requests", () => {
         "track_boxes",
       ].sort(),
     );
+  });
+});
+
+describe("workingConceptPrompts", () => {
+  it("skips saved prompts whose output found nothing, so they are never the prefilled phrase", () => {
+    expect(workingConceptPrompts(findSample("pendulum-synthetic")!)).toEqual(["circle"]);
+    expect(workingConceptPrompts(findSample("collision-synthetic")!)).toEqual(["blue ball"]);
+    expect(workingConceptPrompts(findSample("pendulum-classroom")!)).toEqual([]);
   });
 });

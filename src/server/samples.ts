@@ -48,6 +48,22 @@ export function cachedOutput(sample: Sample, prompt: SamPrompt): string | undefi
   return file === undefined ? undefined : readFileSync(path.join(CONTENT, path.basename(file)), "utf8");
 }
 
+/**
+ * Concept prompts whose saved output actually tracked something, in index order. Some saved outputs are empty on
+ * purpose (e.g. "red ball" on the synthetic pendulum: SAM really finds nothing on video), so the recorded lab-partner
+ * runs replay faithfully; those must not be offered as the default phrase.
+ */
+export function workingConceptPrompts(sample: Sample): string[] {
+  return Object.entries(sample.cached)
+    .filter(([key]) => key.startsWith("concept:"))
+    .filter(([, file]) =>
+      readFileSync(path.join(CONTENT, path.basename(file)), "utf8")
+        .split("\n")
+        .some((line) => line.startsWith("<")),
+    )
+    .map(([key]) => key.slice("concept:".length));
+}
+
 /** The sample video as a data URL, for when the Meta API can't fetch it from us (local development). */
 export function sampleVideoDataUrl(sample: Sample): string {
   const bytes = readFileSync(path.join(PUBLIC, sample.video));

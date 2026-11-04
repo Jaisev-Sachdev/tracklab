@@ -4,7 +4,7 @@ import { Lab } from "@/client/components/Lab";
 import { Logo } from "@/client/components/Logo";
 import type { SampleInfo } from "@/shared/api";
 import { env } from "@/server/env";
-import { samples } from "@/server/samples";
+import { samples, workingConceptPrompts } from "@/server/samples";
 
 export default function Home() {
   const list: SampleInfo[] = samples().map((s) => ({
@@ -18,6 +18,7 @@ export default function Home() {
     cachedPrompts: Object.keys(s.cached)
       .filter((k) => k.startsWith("concept:"))
       .map((k) => k.slice("concept:".length)),
+    suggestedPrompt: workingConceptPrompts(s)[0],
   }));
   return (
     <>

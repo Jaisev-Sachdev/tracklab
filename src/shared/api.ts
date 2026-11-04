@@ -103,6 +103,8 @@ export type SampleInfo = {
   video: string;
   /** Concept prompts with saved SAM output, which replay without a demo code. */
   cachedPrompts: string[];
+  /** The phrase to prefill: a cached concept prompt whose saved output found the object, if any. */
+  suggestedPrompt?: string;
   /** A recorded lab-partner run exists at /replays/<id>.json. */
   hasReplay: boolean;
 };
