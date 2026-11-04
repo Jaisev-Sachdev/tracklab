@@ -1,4 +1,4 @@
-// Demo video, part 1: drive the site in a real browser and record each scene at 1920×1080.
+// Demo video, part 1: drive the site in a real browser and record each scene (1440×810 by default).
 // Scene "classroom": a live lab-partner run on the real classroom pendulum, answering its click question at the bob.
 // Scene "collision": the recorded lab-partner run on the synthetic collision.
 // Writes video-out/<scene>.webm and video-out/<scene>.json (timestamps of key moments, in seconds).
@@ -10,6 +10,8 @@ const [base, code, positionsFile, ...only] = process.argv.slice(2);
 if (!base || !code || !positionsFile) throw new Error("usage: record.ts <base-url> <demo-code> <positions.json>");
 const positions = JSON.parse(readFileSync(positionsFile, "utf8")) as Record<string, [number, number]>;
 const OUT = "video-out";
+// A smaller viewport, upscaled when the video is assembled, keeps the page text legible in a video player.
+const [W, H] = (process.env.VIEW ?? "1440x810").split("x").map(Number) as [number, number];
 mkdirSync(OUT, { recursive: true });
 
 // A ripple wherever the mouse goes down, so viewers see the click.
@@ -28,10 +30,10 @@ async function scene(name: string, run: (page: Page, mark: (label: string) => vo
   if (only.length && !only.includes(name)) return;
   const browser = await chromium.launch();
   const context = await browser.newContext({
-    viewport: { width: 1920, height: 1080 },
+    viewport: { width: W, height: H },
     deviceScaleFactor: 1,
     colorScheme: "dark",
-    recordVideo: { dir: OUT, size: { width: 1920, height: 1080 } },
+    recordVideo: { dir: OUT, size: { width: W, height: H } },
   });
   await context.addInitScript(RIPPLE);
   const page = await context.newPage();

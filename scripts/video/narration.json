@@ -1,0 +1,49 @@
+[
+  {
+    "id": "title",
+    "card": ["Tracklab", "Measure physics from any video", "Meta SAM 3.1 + Muse Spark"],
+    "text": "This is Tracklab. Film a physics experiment, and a Muse Spark lab partner measures it, with honest error bars."
+  },
+  {
+    "id": "problem",
+    "card": ["School labs: a stopwatch, a ruler, and a guess", "Tracklab: every frame tracked, every number fitted"],
+    "text": "In most school labs, a pendulum is timed with a stopwatch and measured by eye. Tracklab turns an ordinary video into a real measurement."
+  },
+  {
+    "id": "classroom",
+    "clip": "classroom",
+    "text": "Here is real classroom footage of a half-metre pendulum, from Wikimedia Commons. The lab partner looks at the frames first, then asks SAM 3.1 to track the bob. The bob is small and dark, so text prompts miss it. Instead of guessing, the agent asks me for one click. From that single click, SAM 3.1 follows the bob through every frame. Tracklab fits a damped pendulum, corrected for the size of the swing. g comes out at 9.48, three and a half percent low, nearly nine standard errors from 9.81. And the lab partner explains why, using numbers our code computed. 9.81 would need a length one point seven centimetres longer, about the size of the bob. So the half metre was most likely measured to the top of the bob, not its centre. Its advice: measure to the centre next time."
+  },
+  {
+    "id": "collision",
+    "clip": "collision",
+    "text": "Collisions work too. SAM keeps each ball's identity through the impact, Tracklab finds the moment of contact, and checks momentum. Here it is conserved to within a fifth of a standard error."
+  },
+  {
+    "id": "accuracy",
+    "card": [
+      "Does it work?",
+      "10 experiments rendered onto real classroom footage",
+      "motion blur · camera noise · compression · known truth",
+      "Pendulums: g within 0.02%  (6 of 6)",
+      "Collisions: momentum & restitution within 1.6σ  (4 of 4)"
+    ],
+    "text": "Does it actually work? We rendered ten experiments onto real classroom footage, with motion blur, camera noise and compression, so the true answers are known exactly. SAM 3.1 tracked every one live. g came out within two hundredths of a percent, and every collision within two standard errors."
+  },
+  {
+    "id": "built",
+    "card": [
+      "How it's built",
+      "SAM 3.1 streams masks for every frame",
+      "Muse Spark drives 10 tools in the browser",
+      "Physics fits written from scratch, with error bars",
+      "Every number in the report must come from a tool"
+    ],
+    "text": "Under the hood, SAM 3.1 streams a mask for every frame. Muse Spark drives ten tools, from looking at frames to fitting physics. And every number in its report must come from a tool. Anything that doesn't is flagged."
+  },
+  {
+    "id": "close",
+    "card": ["Tracklab", "tracklab-olive.vercel.app", "github.com/Jaisev-Sachdev/tracklab"],
+    "text": "Tracklab. Point a phone at an experiment, and get a measurement you can trust."
+  }
+]
