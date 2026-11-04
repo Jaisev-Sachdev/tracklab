@@ -158,6 +158,7 @@ export function VideoStage({
         renderer={renderer}
         objectFit="contain"
         muted
+        loop
         style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
         canvasProps={{ "aria-label": "Experiment video with tracked objects" }}
         onLoadedMetadata={onLoadedMetadata}

@@ -442,298 +442,304 @@ export function Lab({ samples, uploadMode }: { samples: SampleInfo[]; uploadMode
 
   return (
     <div className="lab">
-      <section className="panel sources">
-        <h2>1. Video</h2>
-        <div className="row wrap">
-          {samples.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              className={loaded?.source.kind === "sample" && loaded.source.id === s.id ? "chip on" : "chip"}
-              onClick={() => pickSample(s)}
-              title={s.description}
-            >
-              {s.title}
-            </button>
-          ))}
-          <label className="chip file">
-            {upload === undefined ? "Upload a video…" : `Uploading ${Math.round(upload * 100)}%`}
-            <input
-              type="file"
-              accept="video/mp4,video/quicktime"
-              disabled={upload !== undefined}
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                e.target.value = "";
-                if (f) void pickFile(f);
-              }}
-            />
-          </label>
-        </div>
-        <label className="field">
-          Demo code <small>(needed for uploads and live analysis; samples replay without one)</small>
-          <input
-            type="password"
-            autoComplete="off"
-            value={demoCode}
-            onChange={(e) => setDemoCode(e.target.value.trim())}
-          />
-        </label>
-      </section>
-
-      {loaded && (
-        <section className="panel stage-panel">
-          <VideoStage
-            src={loaded.src}
-            media={meta}
-            result={seg}
-            overlays={overlays}
-            mode={mode}
-            onPick={(p) => {
-              if (answerRef.current) answerRef.current({ kind: "point", p });
-              else placePivot(p);
-              changeMode("none");
-            }}
-            onLine={(l) => {
-              if (answerRef.current) answerRef.current({ kind: "line", line: l });
-              else placeLine(l);
-              changeMode("none");
-            }}
-            clickSession={clickSession}
-            onLoadedMetadata={onMeta}
-            onFrame={(index, time) => setFrame({ index, time })}
-            onError={(e) => setError(e.message)}
-            videoRef={videoRef}
-          />
-          <div className="row">
-            <button type="button" onClick={() => void videoRef.current?.play()}>
-              Play
-            </button>
-            <button type="button" onClick={() => videoRef.current?.pause()}>
-              Pause
-            </button>
-            <button type="button" onClick={() => void videoRef.current?.previousFrame()}>
-              ◀ Frame
-            </button>
-            <button type="button" onClick={() => void videoRef.current?.nextFrame()}>
-              Frame ▶
-            </button>
-            <span className="muted">
-              {meta ? `${meta.width}×${meta.height}, ${meta.numFrames} frames, ${meta.fps.toFixed(1)} fps` : "Loading…"}
-              {frame && (
-                <span className="frame-readout" data-frame={frame.index}>
-                  {" "}
-                  · frame {frame.index}, {frame.time.toFixed(3)} s
-                </span>
-              )}
-            </span>
-          </div>
-          {loaded.credit && (
-            <p className="muted credit">
-              {loaded.creditUrl ? <a href={loaded.creditUrl}>{loaded.credit}</a> : loaded.credit}
-            </p>
-          )}
-        </section>
-      )}
-
-      <AgentPanel
-        key={loadKey}
-        ready={Boolean(loaded && meta)}
-        running={agentRunning}
-        events={agentEvents}
-        question={question}
-        defaultNote={loaded?.note ?? ""}
-        usage={usage}
-        onStart={(note) => void startAgent(note)}
-        onStop={() => agentAbort.current?.abort()}
-        replay={
-          loaded?.source.kind === "sample" &&
-          samples.find((x) => x.id === (loaded.source as { id: string }).id)?.hasReplay
-            ? { onPlay: () => void playReplay(), recordedAt: replayedAt }
-            : undefined
-        }
-        onSave={
-          process.env.NODE_ENV === "development" && loaded?.source.kind === "sample" && !replayedAt
-            ? () => void saveReplay()
-            : undefined
-        }
-        onAnswer={(text) => {
-          const nums = text.match(/-?\d+(?:\.\d+)?/g)?.map(Number) ?? [];
-          // Keyboard alternative to clicking: "x, y" for a point, "x1, y1, x2, y2" for a line.
-          if (question?.answerType === "click_point" && nums.length === 2) {
-            answerRef.current?.({ kind: "point", p: { x: nums[0]!, y: nums[1]! } });
-          } else if (question?.answerType === "click_line" && nums.length === 4) {
-            answerRef.current?.({
-              kind: "line",
-              line: { a: { x: nums[0]!, y: nums[1]! }, b: { x: nums[2]!, y: nums[3]! } },
-            });
-          } else answerRef.current?.({ kind: "text", text });
-        }}
-      />
-
-      {loaded && (
-        <section className="panel">
-          <h2>
-            2. Track <small>(or do it by hand)</small>
-          </h2>
-          <form
-            className="row"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void runTracking();
-            }}
-          >
-            <input
-              aria-label="What to track"
-              placeholder="short noun phrase, e.g. red ball"
-              value={phrase}
-              maxLength={60}
-              onChange={(e) => setPhrase(e.target.value)}
-            />
-            <button type="submit" disabled={!meta || !phrase.trim() || tracking !== undefined || agentRunning}>
-              {tracking ? `Tracking… ${tracking.frames}/${total}` : "Track with SAM 3.1"}
-            </button>
-          </form>
-          {tracks.length > 0 && (
-            <table className="coverage">
-              <thead>
-                <tr>
-                  <th>Object</th>
-                  <th>Frames</th>
-                  <th>Cut off at edge</th>
-                  <th>Longest gap</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tracks.map((t) => {
-                  const c = coverage(t, total);
-                  return (
-                    <tr key={t.objectId}>
-                      <td>
-                        <i className="swatch" style={{ background: objectColor(t.objectId) }} /> {t.objectId}
-                      </td>
-                      <td>
-                        {c.framesTracked}/{total} ({Math.round(c.fraction * 100)}%)
-                      </td>
-                      <td>{c.clippedFrames}</td>
-                      <td>{c.longestGap}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-        </section>
-      )}
-
-      {tracks.length > 0 && (
-        <section className="panel">
-          <h2>3. Measure</h2>
-          <div className="row">
-            <label>
-              <input type="radio" checked={experiment === "pendulum"} onChange={() => setExperiment("pendulum")} />{" "}
-              Pendulum
-            </label>
-            <label>
-              <input type="radio" checked={experiment === "collision"} onChange={() => setExperiment("collision")} />{" "}
-              Collision
-            </label>
-          </div>
-          <div className="grid">
-            <label className="field">
-              {experiment === "pendulum" ? "Bob" : "Object A"}
-              <select value={objectA} onChange={(e) => setObjectA(e.target.value)}>
-                {tracks.map((t) => (
-                  <option key={t.objectId}>{t.objectId}</option>
-                ))}
-              </select>
-            </label>
-            {experiment === "collision" && (
-              <>
-                <label className="field">
-                  Object B
-                  <select value={objectB} onChange={(e) => setObjectB(e.target.value)}>
-                    {tracks.map((t) => (
-                      <option key={t.objectId}>{t.objectId}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="field">
-                  Mass A (kg)
-                  <input inputMode="decimal" value={massA} onChange={(e) => setMassA(e.target.value)} />
-                </label>
-                <label className="field">
-                  Mass B (kg)
-                  <input inputMode="decimal" value={massB} onChange={(e) => setMassB(e.target.value)} />
-                </label>
-              </>
-            )}
-            {experiment === "pendulum" && (
-              <>
-                <div className="field">
-                  Pivot
-                  <button
-                    type="button"
-                    className={mode === "pivot" ? "on" : ""}
-                    onClick={() => changeMode(mode === "pivot" ? "none" : "pivot")}
-                  >
-                    {mode === "pivot"
-                      ? "Click the pivot on the video…"
-                      : pivot
-                        ? `(${pivot.x.toFixed(1)}, ${pivot.y.toFixed(1)}) · change`
-                        : "Mark the pivot"}
-                  </button>
-                </div>
-                <label className="field">
-                  Measured length, pivot to bob centre (m) <small>optional, most accurate</small>
-                  <input
-                    inputMode="decimal"
-                    value={measuredLength}
-                    onChange={(e) => setMeasuredLength(e.target.value)}
-                  />
-                </label>
-              </>
-            )}
-            <div className="field">
-              Scale <small>a line across something of known length</small>
+      <div className="lab-col lab-left">
+        <section className="panel sources">
+          <h2>1. Video</h2>
+          <div className="row wrap">
+            {samples.map((s) => (
               <button
+                key={s.id}
                 type="button"
-                className={mode === "line" ? "on" : ""}
-                onClick={() => changeMode(mode === "line" ? "none" : "line")}
+                className={loaded?.source.kind === "sample" && loaded.source.id === s.id ? "chip on" : "chip"}
+                onClick={() => pickSample(s)}
+                title={s.description}
               >
-                {mode === "line"
-                  ? "Click both ends…"
-                  : line
-                    ? `${Math.hypot(line.b.x - line.a.x, line.b.y - line.a.y).toFixed(1)} px · redraw`
-                    : "Draw the scale line"}
+                {s.title}
               </button>
-            </div>
-            <label className="field">
-              Its real length (m)
+            ))}
+            <label className="chip file">
+              {upload === undefined ? "Upload a video…" : `Uploading ${Math.round(upload * 100)}%`}
               <input
-                inputMode="decimal"
-                value={refLength}
+                type="file"
+                accept="video/mp4,video/quicktime"
+                disabled={upload !== undefined}
                 onChange={(e) => {
-                  setRefLength(e.target.value);
-                  setAnalysis(undefined);
+                  const f = e.target.files?.[0];
+                  e.target.value = "";
+                  if (f) void pickFile(f);
                 }}
               />
             </label>
           </div>
-          <button type="button" className="primary" onClick={analyse} disabled={agentRunning}>
-            Analyse
-          </button>
+          <label className="field">
+            Demo code <small>(needed for uploads and live analysis; samples replay without one)</small>
+            <input
+              type="password"
+              autoComplete="off"
+              value={demoCode}
+              onChange={(e) => setDemoCode(e.target.value.trim())}
+            />
+          </label>
         </section>
-      )}
 
-      {error && (
-        <p className="error" role="alert">
-          {error}
-        </p>
-      )}
+        {loaded && (
+          <section className="panel stage-panel">
+            <VideoStage
+              src={loaded.src}
+              media={meta}
+              result={seg}
+              overlays={overlays}
+              mode={mode}
+              onPick={(p) => {
+                if (answerRef.current) answerRef.current({ kind: "point", p });
+                else placePivot(p);
+                changeMode("none");
+              }}
+              onLine={(l) => {
+                if (answerRef.current) answerRef.current({ kind: "line", line: l });
+                else placeLine(l);
+                changeMode("none");
+              }}
+              clickSession={clickSession}
+              onLoadedMetadata={onMeta}
+              onFrame={(index, time) => setFrame({ index, time })}
+              onError={(e) => setError(e.message)}
+              videoRef={videoRef}
+            />
+            <div className="row">
+              <button type="button" onClick={() => void videoRef.current?.play()}>
+                Play
+              </button>
+              <button type="button" onClick={() => videoRef.current?.pause()}>
+                Pause
+              </button>
+              <button type="button" onClick={() => void videoRef.current?.previousFrame()}>
+                ◀ Frame
+              </button>
+              <button type="button" onClick={() => void videoRef.current?.nextFrame()}>
+                Frame ▶
+              </button>
+              <span className="muted">
+                {meta
+                  ? `${meta.width}×${meta.height}, ${meta.numFrames} frames, ${meta.fps.toFixed(1)} fps`
+                  : "Loading…"}
+                {frame && (
+                  <span className="frame-readout" data-frame={frame.index}>
+                    {" "}
+                    · frame {frame.index}, {frame.time.toFixed(3)} s
+                  </span>
+                )}
+              </span>
+            </div>
+            {loaded.credit && (
+              <p className="muted credit">
+                {loaded.creditUrl ? <a href={loaded.creditUrl}>{loaded.credit}</a> : loaded.credit}
+              </p>
+            )}
+          </section>
+        )}
+      </div>
 
-      {analysis?.kind === "pendulum" && <PendulumResults r={analysis.r} />}
-      {analysis?.kind === "collision" && <CollisionResults r={analysis.r} />}
+      <div className="lab-col">
+        <AgentPanel
+          key={loadKey}
+          ready={Boolean(loaded && meta)}
+          running={agentRunning}
+          events={agentEvents}
+          question={question}
+          defaultNote={loaded?.note ?? ""}
+          usage={usage}
+          onStart={(note) => void startAgent(note)}
+          onStop={() => agentAbort.current?.abort()}
+          replay={
+            loaded?.source.kind === "sample" &&
+            samples.find((x) => x.id === (loaded.source as { id: string }).id)?.hasReplay
+              ? { onPlay: () => void playReplay(), recordedAt: replayedAt }
+              : undefined
+          }
+          onSave={
+            process.env.NODE_ENV === "development" && loaded?.source.kind === "sample" && !replayedAt
+              ? () => void saveReplay()
+              : undefined
+          }
+          onAnswer={(text) => {
+            const nums = text.match(/-?\d+(?:\.\d+)?/g)?.map(Number) ?? [];
+            // Keyboard alternative to clicking: "x, y" for a point, "x1, y1, x2, y2" for a line.
+            if (question?.answerType === "click_point" && nums.length === 2) {
+              answerRef.current?.({ kind: "point", p: { x: nums[0]!, y: nums[1]! } });
+            } else if (question?.answerType === "click_line" && nums.length === 4) {
+              answerRef.current?.({
+                kind: "line",
+                line: { a: { x: nums[0]!, y: nums[1]! }, b: { x: nums[2]!, y: nums[3]! } },
+              });
+            } else answerRef.current?.({ kind: "text", text });
+          }}
+        />
+
+        {loaded && (
+          <section className="panel">
+            <h2>
+              2. Track <small>(or do it by hand)</small>
+            </h2>
+            <form
+              className="row"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void runTracking();
+              }}
+            >
+              <input
+                aria-label="What to track"
+                placeholder="short noun phrase, e.g. red ball"
+                value={phrase}
+                maxLength={60}
+                onChange={(e) => setPhrase(e.target.value)}
+              />
+              <button type="submit" disabled={!meta || !phrase.trim() || tracking !== undefined || agentRunning}>
+                {tracking ? `Tracking… ${tracking.frames}/${total}` : "Track with SAM 3.1"}
+              </button>
+            </form>
+            {tracks.length > 0 && (
+              <table className="coverage">
+                <thead>
+                  <tr>
+                    <th>Object</th>
+                    <th>Frames</th>
+                    <th>Cut off at edge</th>
+                    <th>Longest gap</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tracks.map((t) => {
+                    const c = coverage(t, total);
+                    return (
+                      <tr key={t.objectId}>
+                        <td>
+                          <i className="swatch" style={{ background: objectColor(t.objectId) }} /> {t.objectId}
+                        </td>
+                        <td>
+                          {c.framesTracked}/{total} ({Math.round(c.fraction * 100)}%)
+                        </td>
+                        <td>{c.clippedFrames}</td>
+                        <td>{c.longestGap}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </section>
+        )}
+
+        {tracks.length > 0 && (
+          <section className="panel">
+            <h2>3. Measure</h2>
+            <div className="row">
+              <label>
+                <input type="radio" checked={experiment === "pendulum"} onChange={() => setExperiment("pendulum")} />{" "}
+                Pendulum
+              </label>
+              <label>
+                <input type="radio" checked={experiment === "collision"} onChange={() => setExperiment("collision")} />{" "}
+                Collision
+              </label>
+            </div>
+            <div className="grid">
+              <label className="field">
+                {experiment === "pendulum" ? "Bob" : "Object A"}
+                <select value={objectA} onChange={(e) => setObjectA(e.target.value)}>
+                  {tracks.map((t) => (
+                    <option key={t.objectId}>{t.objectId}</option>
+                  ))}
+                </select>
+              </label>
+              {experiment === "collision" && (
+                <>
+                  <label className="field">
+                    Object B
+                    <select value={objectB} onChange={(e) => setObjectB(e.target.value)}>
+                      {tracks.map((t) => (
+                        <option key={t.objectId}>{t.objectId}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="field">
+                    Mass A (kg)
+                    <input inputMode="decimal" value={massA} onChange={(e) => setMassA(e.target.value)} />
+                  </label>
+                  <label className="field">
+                    Mass B (kg)
+                    <input inputMode="decimal" value={massB} onChange={(e) => setMassB(e.target.value)} />
+                  </label>
+                </>
+              )}
+              {experiment === "pendulum" && (
+                <>
+                  <div className="field">
+                    Pivot
+                    <button
+                      type="button"
+                      className={mode === "pivot" ? "on" : ""}
+                      onClick={() => changeMode(mode === "pivot" ? "none" : "pivot")}
+                    >
+                      {mode === "pivot"
+                        ? "Click the pivot on the video…"
+                        : pivot
+                          ? `(${pivot.x.toFixed(1)}, ${pivot.y.toFixed(1)}) · change`
+                          : "Mark the pivot"}
+                    </button>
+                  </div>
+                  <label className="field">
+                    Measured length, pivot to bob centre (m) <small>optional, most accurate</small>
+                    <input
+                      inputMode="decimal"
+                      value={measuredLength}
+                      onChange={(e) => setMeasuredLength(e.target.value)}
+                    />
+                  </label>
+                </>
+              )}
+              <div className="field">
+                Scale <small>a line across something of known length</small>
+                <button
+                  type="button"
+                  className={mode === "line" ? "on" : ""}
+                  onClick={() => changeMode(mode === "line" ? "none" : "line")}
+                >
+                  {mode === "line"
+                    ? "Click both ends…"
+                    : line
+                      ? `${Math.hypot(line.b.x - line.a.x, line.b.y - line.a.y).toFixed(1)} px · redraw`
+                      : "Draw the scale line"}
+                </button>
+              </div>
+              <label className="field">
+                Its real length (m)
+                <input
+                  inputMode="decimal"
+                  value={refLength}
+                  onChange={(e) => {
+                    setRefLength(e.target.value);
+                    setAnalysis(undefined);
+                  }}
+                />
+              </label>
+            </div>
+            <button type="button" className="primary" onClick={analyse} disabled={agentRunning}>
+              Analyse
+            </button>
+          </section>
+        )}
+
+        {error && (
+          <p className="error" role="alert">
+            {error}
+          </p>
+        )}
+
+        {analysis?.kind === "pendulum" && <PendulumResults r={analysis.r} />}
+        {analysis?.kind === "collision" && <CollisionResults r={analysis.r} />}
+      </div>
     </div>
   );
 }

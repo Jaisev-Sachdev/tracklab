@@ -466,6 +466,13 @@ button.link {
   color: inherit;
 }
 
+.lab-col {
+  display: grid;
+  gap: 1rem;
+  align-content: start;
+  min-width: 0;
+}
+
 /* Wide screens: the video stays in view on the left while the lab partner and results scroll on the right. */
 @media (min-width: 1400px) {
   main {
@@ -477,18 +484,7 @@ button.link {
     align-items: start;
   }
 
-  .lab > * {
-    grid-column: 2;
-  }
-
-  .lab > .sources {
-    grid-column: 1;
-    grid-row: 1;
-  }
-
-  .lab > .stage-panel {
-    grid-column: 1;
-    grid-row: 2 / span 30;
+  .lab-left {
     position: sticky;
     top: 1rem;
   }
