@@ -5,6 +5,9 @@ checks its own work, and tells you what to fix next time.**
 
 Built for the Meta Global AI Developer Hackathon (Indie track, "Push the Frontier").
 
+**Live:** https://tracklab-olive.vercel.app. Open a sample and press "Watch a recorded run" to see the lab partner
+work; live analysis and uploads need a demo code (judges: see the submission form).
+
 A school pendulum or a collision of two carts is usually timed with a stopwatch and eyeballed against a ruler.
 Tracklab turns a phone video into a measurement with honest error bars:
 
@@ -71,6 +74,8 @@ npm run check                # typecheck, lint, format, 74 tests
 Live calls (SAM, Muse Spark, uploads) need a demo code in production (`DEMO_CODES`); without one, the bundled samples
 replay saved SAM output and recorded lab-partner runs. Other settings: `BLOB_PUBLIC_HOST`, `BLOB_READ_WRITE_TOKEN`,
 `MAX_VIDEO_SECONDS`, `SPARK_MODEL` (see `src/server/env.ts`).
+
+Check a deployment's upload path (one short SAM call): `npx tsx scripts/smoke-upload.ts <url> <demo-code>`.
 
 Reproduce the benchmark (renders from the Commons footage, then about $0.70 of SAM calls):
 
