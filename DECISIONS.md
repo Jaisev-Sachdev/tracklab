@@ -197,6 +197,6 @@ asking for a click, and explain the stated-length pitfall.
 pivot, scale and analysis the tools set, and the run's cost. "Watch a recorded run" plays it back at a readable pace,
 applying the state as the original tools did; it makes no API calls. The unverified-numbers check now accepts
 roundings of measured numbers (9.480 → 9.48) and is recomputed when a run is saved.
-**Consequence:** Three recorded runs, 60–75 KB each: synthetic pendulum (g = 9.799 ± 0.067), synthetic collision
+**Consequence:** Three recorded runs, 90–150 KB each: synthetic pendulum (g = 9.799 ± 0.067), synthetic collision
 (ratio 0.997 ± 0.012) and the real classroom pendulum (g = 9.480 ± 0.038 with the knot diagnosis; "1.7" flagged as
 the agent's own arithmetic). Playback shows trails, not SAM's masks, since masks aren't stored.
