@@ -32,7 +32,7 @@ type Analysis = { kind: "pendulum"; r: PendulumResult } | { kind: "collision"; r
 
 const num = (s: string) => (s.trim() === "" ? undefined : Number(s));
 
-export function Lab({ samples }: { samples: SampleInfo[] }) {
+export function Lab({ samples, uploadMode }: { samples: SampleInfo[]; uploadMode: "token" | "presigned" }) {
   const videoRef = useRef<VideoRef>(null);
   const demoCode = useSyncExternalStore(subscribeDemoCode, getDemoCode, () => "");
   const [loaded, setLoaded] = useState<Loaded>();
@@ -116,7 +116,7 @@ export function Lab({ samples }: { samples: SampleInfo[] }) {
     setError(undefined);
     try {
       setUpload(0);
-      const url = await uploadVideo(file, setUpload);
+      const url = await uploadVideo(file, uploadMode, setUpload);
       // Play the local file (instant, no CORS); SAM reads the uploaded copy.
       reset({ source: { kind: "blob", url }, src: file, label: file.name, note: "" });
       setPhrase("");

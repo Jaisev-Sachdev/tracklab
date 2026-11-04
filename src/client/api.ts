@@ -7,7 +7,7 @@ import {
   type VideoSegmentationResult,
   type VideoSegmentationSnapshot,
 } from "@meta-sam/parser";
-import { upload } from "@vercel/blob/client";
+import { upload, uploadPresigned } from "@vercel/blob/client";
 import { DEMO_CODE_HEADER, type AgentItem, type SamPrompt, type VideoSource } from "@/shared/api";
 import { readSse } from "@/shared/sse";
 import { getDemoCode } from "./demo-code";
@@ -76,15 +76,25 @@ export async function agentStep(input: AgentItem[], signal?: AbortSignal): Promi
   return (await res.json()) as AgentStepResult;
 }
 
-/** Upload a video straight to Vercel Blob; our route only issues the token. */
-export async function uploadVideo(file: File, onProgress?: (fraction: number) => void): Promise<string> {
+/**
+ * Upload a video straight to Vercel Blob; our route only authorises it. `mode` follows the store: classic stores use
+ * client tokens, OIDC stores use presigned URLs (single PUT, so no multipart).
+ */
+export async function uploadVideo(
+  file: File,
+  mode: "token" | "presigned",
+  onProgress?: (fraction: number) => void,
+): Promise<string> {
   const safeName = file.name.replace(/[^\w.-]+/g, "-").slice(-80) || "video.mp4";
-  const blob = await upload(`uploads/${safeName}`, file, {
-    access: "public",
+  const common = {
+    access: "public" as const,
     handleUploadUrl: "/api/upload",
     headers: headers(),
-    multipart: file.size > 20 * 1024 * 1024,
-    onUploadProgress: ({ percentage }) => onProgress?.(percentage / 100),
-  });
+    onUploadProgress: ({ percentage }: { percentage: number }) => onProgress?.(percentage / 100),
+  };
+  const blob =
+    mode === "token"
+      ? await upload(`uploads/${safeName}`, file, { ...common, multipart: file.size > 20 * 1024 * 1024 })
+      : await uploadPresigned(`uploads/${safeName}`, file, common);
   return blob.url;
 }

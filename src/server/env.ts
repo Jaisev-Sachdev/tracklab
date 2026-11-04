@@ -20,6 +20,8 @@ const Env = z.object({
     .optional(),
   /** Set by Vercel when a Blob store is connected; used to issue upload tokens and to learn the store host. */
   BLOB_READ_WRITE_TOKEN: z.string().optional(),
+  /** Set by Vercel for stores that use its OIDC credentials instead of a read-write token. */
+  BLOB_STORE_ID: z.string().optional(),
   /** Longest video SAM will be asked to track, in seconds. SAM bills per frame. */
   MAX_VIDEO_SECONDS: z.coerce.number().positive().default(60),
 });

@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { Lab } from "@/client/components/Lab";
 import type { SampleInfo } from "@/shared/api";
+import { env } from "@/server/env";
 import { samples } from "@/server/samples";
 
 export default function Home() {
@@ -23,7 +24,7 @@ export default function Home() {
         <h1>Tracklab</h1>
         <p>Film a physics experiment. SAM 3.1 tracks it frame by frame; the fits measure it, with honest error bars.</p>
       </header>
-      <Lab samples={list} />
+      <Lab samples={list} uploadMode={env().BLOB_READ_WRITE_TOKEN ? "token" : "presigned"} />
     </>
   );
 }

@@ -37,13 +37,13 @@ let probedHost: Promise<string | undefined> | undefined;
 
 /**
  * This project's Blob store hostname: BLOB_PUBLIC_HOST if set, otherwise learned once by writing a tiny probe file
- * with the store's own token (Vercel sets BLOB_READ_WRITE_TOKEN when a store is connected), so deploying needs no
- * hand-copied hostname.
+ * with the store's own credentials (a read-write token, or Vercel's OIDC token with BLOB_STORE_ID), so deploying
+ * needs no hand-copied hostname.
  */
 export function blobPublicHost(): Promise<string | undefined> {
-  const { BLOB_PUBLIC_HOST, BLOB_READ_WRITE_TOKEN } = env();
+  const { BLOB_PUBLIC_HOST, BLOB_READ_WRITE_TOKEN, BLOB_STORE_ID } = env();
   if (BLOB_PUBLIC_HOST) return Promise.resolve(BLOB_PUBLIC_HOST);
-  if (!BLOB_READ_WRITE_TOKEN) return Promise.resolve(undefined);
+  if (!BLOB_READ_WRITE_TOKEN && !BLOB_STORE_ID) return Promise.resolve(undefined);
   probedHost ??= import("@vercel/blob")
     .then(({ put }) =>
       put("uploads/.tracklab-probe.txt", "probe", { access: "public", addRandomSuffix: false, allowOverwrite: true }),
