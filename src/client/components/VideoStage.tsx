@@ -23,11 +23,14 @@ type Props = {
   result: VideoSegmentationResult | VideoSegmentationSnapshot | undefined;
   overlays: StageOverlays;
   mode: ClickMode;
+  /** Changes whenever the click mode is entered or left; a line's first end only counts within one session. */
+  clickSession: number;
   /** A pivot click (mode "pivot"). */
   onPick: (p: Point) => void;
   /** Both ends of the scale line (mode "line"). */
   onLine: (l: Line) => void;
   onLoadedMetadata: (m: MediaPlayerLoadedMetadata) => void;
+  onFrame: (frameIndex: number, time: number) => void;
   onError: (e: Error) => void;
   videoRef: Ref<VideoRef>;
 };
@@ -39,9 +42,11 @@ export function VideoStage({
   result,
   overlays,
   mode,
+  clickSession,
   onPick,
   onLine,
   onLoadedMetadata,
+  onFrame,
   onError,
   videoRef,
 }: Props) {
@@ -54,8 +59,8 @@ export function VideoStage({
   const canvas = useRef<HTMLCanvasElement>(null);
   const [box, setBox] = useState<Size>({ width: 0, height: 0 });
   // First end of a scale line, remembered only while still in line mode.
-  const [firstEnd, setFirstEnd] = useState<{ p: Point; mode: ClickMode } | undefined>();
-  const pending = firstEnd?.mode === "line" && mode === "line" ? firstEnd.p : undefined;
+  const [firstEnd, setFirstEnd] = useState<{ p: Point; session: number } | undefined>();
+  const pending = mode === "line" && firstEnd?.session === clickSession ? firstEnd.p : undefined;
 
   useEffect(() => {
     const el = wrap.current;
@@ -137,7 +142,7 @@ export function VideoStage({
     if (mode === "pivot") {
       onPick(p);
     } else if (!pending) {
-      setFirstEnd({ p, mode });
+      setFirstEnd({ p, session: clickSession });
     } else {
       setFirstEnd(undefined);
       onLine({ a: pending, b: p });
@@ -156,6 +161,7 @@ export function VideoStage({
         style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
         canvasProps={{ "aria-label": "Experiment video with tracked objects" }}
         onLoadedMetadata={onLoadedMetadata}
+        onFrame={({ frameIndex, time }) => onFrame(frameIndex, time)}
         onError={onError}
       />
       <canvas

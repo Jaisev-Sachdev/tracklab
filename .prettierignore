@@ -4,3 +4,5 @@ package-lock.json
 next-env.d.ts
 spike-out/
 test/fixtures/
+bench-out/
+footage-src/

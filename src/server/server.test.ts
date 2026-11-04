@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { hasLiveAccess } from "./access";
 import { AgentInputError, agentContent, agentRequestBody, countImages } from "./agent";
 import { resetEnvForTests } from "./env";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
 import { z } from "zod";
 import { AgentStepRequest } from "@/shared/api";
 import { readBody, readTextCapped } from "./http";
@@ -121,9 +122,10 @@ describe("request bodies", () => {
 describe("samples", () => {
   it("has saved output for every cached prompt and none for others", () => {
     for (const s of samples()) {
-      for (const key of Object.keys(s.cached)) {
-        const phrase = key.replace(/^concept:/, "");
-        expect(cachedOutput(s, { kind: "concept", phrase })).toBeTypeOf("string");
+      for (const [key, file] of Object.entries(s.cached)) {
+        expect(existsSync(path.join("content", "samples", file))).toBe(true);
+        if (!key.startsWith("concept:")) continue;
+        expect(cachedOutput(s, { kind: "concept", phrase: key.slice("concept:".length) })).toBeTypeOf("string");
       }
     }
     const pendulum = findSample("pendulum-synthetic")!;

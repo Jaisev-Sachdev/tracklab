@@ -124,3 +124,67 @@ their findings with probes.
 **Consequence:** 54 tests. Still open, by choice: no per-code rate limit (use long random demo codes, rotate them,
 and keep Meta's spend alert); the UI must convert pivot clicks to continuous pixel coordinates (pixel i's centre is
 i + 0.5), not the parser README's floored indices, or g picks up about +0.1% bias.
+
+## D-010 The lab partner loop, and what live runs taught it (2026-11-03)
+
+**Context:** Step 4 wires Muse Spark 1.3 to the tools in the browser. Live runs on the synthetic samples drove changes.
+**Decision:**
+
+- `runAgent` keeps the conversation, sends one step at a time, runs the called tool, and returns tool images in a user
+  message right after the tool output (portable across Responses-compatible APIs). Reasoning items aren't resent.
+  Tool errors go back to the model as text. Budgets: 16 tool calls, then "finish now", then stop; two nudges if it
+  answers without a tool; at most 20 images kept (oldest replaced by a note).
+- Frames for the model are the decoded frame at source resolution, annotated in source pixels (ids, pivot, scale
+  line), sent at 640 px wide; `locate` sends up to 1920 px for small things like a clamp and scales boxes back.
+- The tools read the newest page state through a ref mirror, since the loop outlives renders.
+- `analyse_pendulum` reports an uncertainty budget (shares of var(g)). In the first live run the agent advised
+  "film longer" when the scale line, not the period, limited g; with the budget and an instruction to target its
+  largest share, it advised measuring the length to ±1 mm instead. It now also uses a length the person states.
+
+**Consequence:** Live results: pendulum g = 9.799 ± 0.067 (scale line) and 9.811 ± 0.039 (stated length), about
+$0.12–0.21 a run; collision momentum ratio 0.997 ± 0.012 after asking for the masses, about $0.05. In both pendulum
+runs "red ball" found nothing on video and the agent recovered (another phrase, or `locate` + `track_boxes`).
+
+## D-011 Fixes from an independent review of steps 3 and 4 (2026-11-04)
+
+**Context:** A reviewer read the browser code (agent loop, tools, page state) without our conclusions.
+**Decision:** Fixed:
+
+- The model's `finish` arguments are validated (`parseReport`) before the UI sees them; an incomplete report goes back
+  to the model instead of crashing the page. Decimal numbers in the headline or comparison that appear in no tool
+  result or note are listed under the report as not measured (`unverifiedNumbers`).
+- An invented tool name no longer enters the conversation (the server would 400 on it); the model is told which tools
+  exist. The budget now runs exactly `maxToolCalls` tools; stopping mid-step ends cleanly.
+- Only the newest tracking run commits tracks; manual Track and Analyse are disabled while the agent runs; a stale agent
+  run (after Stop or a video change) can't seek, capture or log. Results clear when the pivot or scale changes.
+- A half-drawn scale line is tied to one click session and never completes later. The agent note resets per video.
+- `analyse_collision` refuses the same object twice; the stated length's error can't be set below 1 mm; frames for
+  the model fit 640×640 and images are also pruned by total size, so portrait video can't break the 4.5 MB limit; the
+  `get_frames` description says image coordinates are scaled.
+- `ask` cleans up its abort listener, seeks to the nearest frame, and clicks can be typed as coordinates (keyboard
+  access). The timeline and questions are live regions. Cost counts SAM still-frame calls and failed live tracks.
+
+**Consequence:** 74 tests. Still open: no `error.tsx` boundary; tests don't exercise `track_boxes` rounding or
+`locate` scaling directly (both were checked by the reviewer).
+
+## D-012 Real footage and an accuracy benchmark, without filming (2026-11-04)
+
+**Context:** We can't film our own experiments. We need real footage for credibility and known truth for accuracy.
+**Decision:**
+
+- Real sample: a 13 s excerpt of "Pendelgesetz (mit Rechnung)" (Mathe-AC Lernwerkstatt Aachen, Wikimedia Commons,
+  CC BY-SA 4.0), a 0.5 m classroom pendulum, credited in the UI. SAM can't find its small dark bob from a phrase, but
+  tracks it from one box or click in 319–323 of 326 frames. g = 9.48 ± 0.04 m/s², about 3.5% low: the length that
+  would give 9.81 is 0.517 m, so the board's 0.5 m is most likely measured to the knot, not the bob's centre. The agent
+  reaches that diagnosis itself from `length_that_would_give_9_81_m`, after asking for one click.
+- Dropped: Apollo 15's hammer-feather drop (NASA, public domain): in the wide shot the hammer is about 10 px on
+  interlaced 1971 video with no reliable scale. A real Commons ball collision: under a second of oblique motion.
+- Benchmark (`npm run bench:render && npm run bench:run`, results in `docs/accuracy.md`): 6 pendulums and 4
+  collisions composited onto real classroom footage. Pendulum motion is integrated from the nonlinear damped equation
+  (not the series formula the analysis inverts), rendered at 4× and averaged for motion blur, with sensor noise and
+  H.264 compression. SAM tracks live from a first-frame box. Results: g within 0.02% (tape length) and 0.17% (video
+  scale only) on all six; momentum ratio and restitution within 1.6σ on all four, contact within 4 ms. About $0.70.
+
+**Consequence:** The source downloads (`footage-src/`) and rendered clips (`bench-out/`) are git-ignored and
+reproducible from the scripts. The agent's instructions now cap phrase guessing (two `track`, one `locate`) before
+asking for a click, and explain the stated-length pitfall.

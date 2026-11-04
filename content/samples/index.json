@@ -1,8 +1,25 @@
 [
   {
+    "id": "pendulum-classroom",
+    "title": "Classroom pendulum (real footage)",
+    "description": "A real classroom string pendulum. The yellow arrow on the board marks the pendulum length as 0.5 m, from the pivot (the white dot at the top).",
+    "credit": "Excerpt of “Pendelgesetz (mit Rechnung)” by Mathe-AC Lernwerkstatt Aachen (Rhetos), Wikimedia Commons, CC BY-SA 4.0. Trimmed and re-encoded.",
+    "creditUrl": "https://commons.wikimedia.org/wiki/File:Pendelgesetz_(mit_Rechnung).webm",
+    "video": "/samples/pendulum-classroom.mp4",
+    "width": 1920,
+    "height": 1080,
+    "fps": 25,
+    "frames": 326,
+    "cached": {
+      "concept:pendulum bob": "pendulum-classroom.pendulum-bob.txt",
+      "objects:5ff2e6a1c0a6296a": "pendulum-classroom.box-75-726-538.txt"
+    }
+  },
+  {
     "id": "pendulum-synthetic",
     "title": "Synthetic pendulum",
     "description": "Rendered 0.5 m pendulum at a 10° swing, so the true g is known (9.81). The pivot is the black square; the bar at the bottom is 0.5 m.",
+    "credit": "Synthetic clip rendered by Tracklab (MIT).",
     "video": "/samples/pendulum-synthetic.mp4",
     "width": 1280,
     "height": 720,
@@ -17,6 +34,7 @@
     "id": "collision-synthetic",
     "title": "Synthetic collision",
     "description": "Two equal balls in a perfectly elastic collision, so momentum and kinetic energy are both conserved.",
+    "credit": "Synthetic clip rendered by Tracklab (MIT).",
     "video": "/samples/collision-synthetic.mp4",
     "width": 1280,
     "height": 720,

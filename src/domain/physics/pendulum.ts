@@ -33,6 +33,11 @@ export type PendulumResult = {
   cycles: number;
   fitRmsDeg: number;
   g?: Measured;
+  /**
+   * Fraction of g's variance from each source (sums to 1): the period, and either the measured length or the video
+   * length's two parts (the scale line and the pivot/tracking).
+   */
+  uncertaintyBudget?: Partial<Record<"period" | "measuredLength" | "scaleLine" | "pivotAndTracking", number>>;
   /** For plotting: the measured angle (rad) per sample and the fitted curve's parameters (see `angleAt`). */
   series: { t: number[]; theta: number[] };
   angleFit: AngleFit;
@@ -157,6 +162,15 @@ export function analysePendulum(track: Track, opts: PendulumOptions = {}): Pendu
     const L = result.lengthUsedM;
     const g = (4 * Math.PI * Math.PI * L.value) / (small * small);
     result.g = { value: g, se: g * Math.hypot(L.se / L.value, (2 * smallSe) / small) };
+    // Shares of var(g)/g², so advice can target what actually limits the result.
+    const parts: Record<string, number> = { period: ((2 * smallSe) / small) ** 2 };
+    if (L.source === "measured") parts.measuredLength = (L.se / L.value) ** 2;
+    else {
+      parts.scaleLine = (opts.calibration!.pxPerMSe / opts.calibration!.pxPerM) ** 2;
+      parts.pivotAndTracking = (lengthPx.se / lengthPx.value) ** 2;
+    }
+    const total = Object.values(parts).reduce((s, v) => s + v, 0) || 1;
+    result.uncertaintyBudget = Object.fromEntries(Object.entries(parts).map(([k, v]) => [k, v / total]));
   } else if (opts.calibration) {
     warnings.push(
       "The pivot wasn't marked, so the length can't be read from the video. Mark the pivot or measure the length by hand to get g.",

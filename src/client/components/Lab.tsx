@@ -3,18 +3,29 @@
 import { objectColor } from "@meta-sam/graphics";
 import { frameIndexOf, type VideoSegmentationResult, type VideoSegmentationSnapshot } from "@meta-sam/parser";
 import type { MediaPlayerLoadedMetadata, VideoRef } from "@meta-sam/react";
-import { useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { calibrationFromLine } from "@/domain/physics/calibration";
 import { analyseCollision, type CollisionResult } from "@/domain/physics/collision";
 import { analysePendulum, type PendulumResult } from "@/domain/physics/pendulum";
 import { coverage, tracksFromRecords, type Track } from "@/domain/track/track";
-import type { SampleInfo, VideoSource } from "@/shared/api";
-import { trackVideo, uploadVideo } from "../api";
+import type { SamPrompt, SampleInfo, VideoSource } from "@/shared/api";
+import { runAgent, type AgentEvent } from "../agent/runner";
+import { nearestFrame } from "../agent/frames";
+import { makeTools, type Answer, type LabContext, type Question } from "../agent/tools";
+import { agentStep, trackVideo, uploadVideo } from "../api";
 import { getDemoCode, setDemoCode, subscribeDemoCode } from "../demo-code";
+import { AgentPanel } from "./AgentPanel";
 import { CollisionResults, PendulumResults } from "./Results";
 import { VideoStage, type ClickMode, type Line, type Point } from "./VideoStage";
 
-type Loaded = { source: VideoSource; src: string | Blob; label: string };
+type Loaded = {
+  source: VideoSource;
+  src: string | Blob;
+  label: string;
+  note: string;
+  credit?: string;
+  creditUrl?: string;
+};
 type Meta = { width: number; height: number; numFrames: number; fps: number; frameTimes: number[] };
 type Analysis = { kind: "pendulum"; r: PendulumResult } | { kind: "collision"; r: CollisionResult };
 
@@ -30,6 +41,7 @@ export function Lab({ samples }: { samples: SampleInfo[] }) {
   const [tracking, setTracking] = useState<{ frames: number } | undefined>();
   const [tracks, setTracks] = useState<Track[]>([]);
   const [mode, setMode] = useState<ClickMode>("none");
+  const [frame, setFrame] = useState<{ index: number; time: number }>();
   const [pivot, setPivot] = useState<Point>();
   const [line, setLine] = useState<Line>();
   const [refLength, setRefLength] = useState("");
@@ -43,9 +55,30 @@ export function Lab({ samples }: { samples: SampleInfo[] }) {
   const [error, setError] = useState<string>();
   const [upload, setUpload] = useState<number>();
   const abort = useRef<AbortController | null>(null);
+  const [agentEvents, setAgentEvents] = useState<AgentEvent[]>([]);
+  const [agentRunning, setAgentRunning] = useState(false);
+  const [question, setQuestion] = useState<Question>();
+  const [usage, setUsage] = useState({ inputTokens: 0, outputTokens: 0, samFrames: 0, samImages: 0 });
+  // Bumped on every video change, so per-video UI (the agent note, a half-drawn line) starts fresh.
+  const [loadKey, setLoadKey] = useState(0);
+  // Bumped on every click-mode change, so a half-drawn scale line never completes later.
+  const [clickSession, setClickSession] = useState(0);
+  const trackRun = useRef(0);
+  const agentAbort = useRef<AbortController | null>(null);
+  const answerRef = useRef<((a: Answer) => void) | null>(null);
+
+  // The agent's tools run across many renders and network calls; they read the newest state from here.
+  const live = useRef({ meta, tracks, pivot, line, refLength, loaded });
+  useEffect(() => {
+    live.current = { meta, tracks, pivot, line, refLength, loaded };
+  });
 
   function reset(next: Loaded) {
     abort.current?.abort();
+    agentAbort.current?.abort();
+    setAgentEvents([]);
+    setUsage({ inputTokens: 0, outputTokens: 0, samFrames: 0, samImages: 0 });
+    setLoadKey((k) => k + 1);
     setLoaded(next);
     setMeta(undefined);
     setSeg(undefined);
@@ -54,11 +87,23 @@ export function Lab({ samples }: { samples: SampleInfo[] }) {
     setLine(undefined);
     setAnalysis(undefined);
     setError(undefined);
-    setMode("none");
+    changeMode("none");
+  }
+
+  function changeMode(next: ClickMode) {
+    setMode(next);
+    setClickSession((n) => n + 1);
   }
 
   function pickSample(s: SampleInfo) {
-    reset({ source: { kind: "sample", id: s.id }, src: new URL(s.video, location.href).toString(), label: s.title });
+    reset({
+      source: { kind: "sample", id: s.id },
+      src: new URL(s.video, location.href).toString(),
+      label: s.title,
+      note: s.description,
+      credit: s.credit,
+      creditUrl: s.creditUrl,
+    });
     setPhrase(s.cachedPrompts[0] ?? "");
     setExperiment(s.id.startsWith("collision") ? "collision" : "pendulum");
   }
@@ -69,7 +114,7 @@ export function Lab({ samples }: { samples: SampleInfo[] }) {
       setUpload(0);
       const url = await uploadVideo(file, setUpload);
       // Play the local file (instant, no CORS); SAM reads the uploaded copy.
-      reset({ source: { kind: "blob", url }, src: file, label: file.name });
+      reset({ source: { kind: "blob", url }, src: file, label: file.name, note: "" });
       setPhrase("");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -90,41 +135,177 @@ export function Lab({ samples }: { samples: SampleInfo[] }) {
     });
   }
 
+  /** Track with SAM through the whole video; shared by the Track button and the agent. Throws on failure. */
+  async function track(prompt: SamPrompt, signal: AbortSignal): Promise<Track[]> {
+    const { loaded: current, meta: m } = live.current;
+    if (!current || !m) throw new Error("The video hasn't loaded yet.");
+    const run = ++trackRun.current;
+    const isCurrent = () => run === trackRun.current;
+    setAnalysis(undefined);
+    setTracks([]);
+    live.current.tracks = [];
+    setTracking({ frames: 0 });
+    // Saved sample output replays free; live calls bill per frame (minimum 50), even if they then fail.
+    const src = current.source;
+    const sample = src.kind === "sample" ? samples.find((x) => x.id === src.id) : undefined;
+    const replayed = prompt.kind === "concept" && sample?.cachedPrompts.includes(prompt.phrase.trim().toLowerCase());
+    if (!replayed) setUsage((u) => ({ ...u, samFrames: u.samFrames + Math.max(50, m.numFrames) }));
+    try {
+      const result = await trackVideo(current.source, prompt, {
+        signal,
+        onSnapshot: (snap) => {
+          if (!isCurrent()) return;
+          setSeg(snap);
+          setTracking({ frames: new Set(snap.records.map(frameIndexOf)).size });
+        },
+      });
+      if (!isCurrent()) throw new Error("A newer tracking run replaced this one.");
+      setSeg(result);
+      const found = tracksFromRecords(result.records, { frameTimes: m.frameTimes, width: m.width, height: m.height });
+      live.current.tracks = found;
+      setTracks(found);
+      setObjectA(found[0]?.objectId ?? "");
+      setObjectB(found[1]?.objectId ?? "");
+      return found;
+    } finally {
+      if (isCurrent()) setTracking(undefined);
+    }
+  }
+
   async function runTracking() {
-    if (!loaded || !meta || !phrase.trim()) return;
+    if (!phrase.trim()) return;
     abort.current?.abort();
     const ctrl = new AbortController();
     abort.current = ctrl;
     setError(undefined);
-    setAnalysis(undefined);
-    setTracks([]);
-    setTracking({ frames: 0 });
     try {
-      const result = await trackVideo(
-        loaded.source,
-        { kind: "concept", phrase: phrase.trim() },
-        {
-          signal: ctrl.signal,
-          onSnapshot: (s) => {
-            setSeg(s);
-            setTracking({ frames: new Set(s.records.map(frameIndexOf)).size });
-          },
-        },
-      );
-      setSeg(result);
-      const found = tracksFromRecords(result.records, {
-        frameTimes: meta.frameTimes,
-        width: meta.width,
-        height: meta.height,
-      });
-      setTracks(found);
-      setObjectA(found[0]?.objectId ?? "");
-      setObjectB(found[1]?.objectId ?? "");
+      const found = await track({ kind: "concept", phrase: phrase.trim() }, ctrl.signal);
       if (found.length === 0) setError(`SAM found no "${phrase.trim()}" in the video. Try another short phrase.`);
     } catch (e) {
       if (!ctrl.signal.aborted) setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  function placePivot(p: Point) {
+    live.current.pivot = p;
+    setPivot(p);
+    setAnalysis(undefined);
+  }
+
+  function placeLine(l: Line, lengthM?: number) {
+    live.current.line = l;
+    setLine(l);
+    setAnalysis(undefined);
+    if (lengthM !== undefined) {
+      live.current.refLength = String(lengthM);
+      setRefLength(String(lengthM));
+    }
+  }
+
+  function calibrationNow() {
+    const L = num(live.current.refLength);
+    const l = live.current.line;
+    if (!l || !L || !(L > 0)) return undefined;
+    try {
+      return calibrationFromLine({ x1: l.a.x, y1: l.a.y, x2: l.b.x, y2: l.b.y }, L);
+    } catch {
+      return undefined;
+    }
+  }
+
+  async function startAgent(note: string) {
+    const { loaded: current, meta: m } = live.current;
+    if (!current || !m) return;
+    agentAbort.current?.abort();
+    const ctrl = new AbortController();
+    agentAbort.current = ctrl;
+    const isCurrent = () => agentAbort.current === ctrl;
+    setAgentEvents([]);
+    setAgentRunning(true);
+    setError(undefined);
+
+    const ctx: LabContext = {
+      meta: () => live.current.meta,
+      seekToFrame: async (f) => {
+        if (!isCurrent()) throw new Error("Stopped.");
+        await videoRef.current?.seekToFrame(f);
+      },
+      captureRawFrame: () => {
+        const v = videoRef.current;
+        if (!v) throw new Error("The video player isn't ready.");
+        return v.captureFrame("raw");
+      },
+      tracks: () => live.current.tracks,
+      pivot: () => live.current.pivot,
+      line: () => live.current.line,
+      calibration: calibrationNow,
+      runTracking: track,
+      setPivot: placePivot,
+      setCalibration: (l, lengthM) => placeLine(l, lengthM),
+      ask: (q, signal) =>
+        new Promise<Answer>((resolve, reject) => {
+          if (signal.aborted) return reject(new Error("Stopped."));
+          setQuestion(q);
+          const times = live.current.meta?.frameTimes;
+          if (q.timeS !== undefined && times) void videoRef.current?.seekToFrame(nearestFrame(times, q.timeS));
+          if (q.answerType === "click_point") changeMode("pivot");
+          if (q.answerType === "click_line") changeMode("line");
+          const finish = () => {
+            answerRef.current = null;
+            signal.removeEventListener("abort", onAbort);
+            setQuestion(undefined);
+            changeMode("none");
+          };
+          const onAbort = () => {
+            finish();
+            reject(new Error("Stopped."));
+          };
+          answerRef.current = (a) => {
+            finish();
+            resolve(a);
+          };
+          signal.addEventListener("abort", onAbort, { once: true });
+        }),
+      countImageCall: () => setUsage((u) => ({ ...u, samImages: u.samImages + 1 })),
+      showPendulum: (r) => {
+        setExperiment("pendulum");
+        setAnalysis({ kind: "pendulum", r });
+      },
+      showCollision: (r) => {
+        setExperiment("collision");
+        setAnalysis({ kind: "collision", r });
+      },
+    };
+
+    const duration = m.frameTimes.at(-1) ?? 0;
+    const start =
+      `Video "${current.label}": ${m.width}×${m.height} px, ${m.numFrames} frames, ${duration.toFixed(2)} s, ` +
+      `about ${m.fps.toFixed(1)} fps.\n` +
+      (note.trim() ? `Notes from the person: ${note.trim()}` : "The person gave no notes.");
+
+    try {
+      await runAgent({
+        start,
+        step: (input, signal) => agentStep(input, signal),
+        tools: makeTools(ctx),
+        signal: ctrl.signal,
+        onEvent: (e) => {
+          if (!isCurrent()) return;
+          if (e.kind === "usage") {
+            setUsage((u) => ({
+              ...u,
+              inputTokens: u.inputTokens + e.inputTokens,
+              outputTokens: u.outputTokens + e.outputTokens,
+            }));
+          } else {
+            setAgentEvents((list) => [...list, e]);
+          }
+        },
+      });
+    } catch (e) {
+      if (!ctrl.signal.aborted && isCurrent()) setError(e instanceof Error ? e.message : String(e));
     } finally {
-      if (abort.current === ctrl) setTracking(undefined);
+      if (isCurrent()) setAgentRunning(false);
     }
   }
 
@@ -230,14 +411,18 @@ export function Lab({ samples }: { samples: SampleInfo[] }) {
             overlays={overlays}
             mode={mode}
             onPick={(p) => {
-              setPivot(p);
-              setMode("none");
+              if (answerRef.current) answerRef.current({ kind: "point", p });
+              else placePivot(p);
+              changeMode("none");
             }}
             onLine={(l) => {
-              setLine(l);
-              setMode("none");
+              if (answerRef.current) answerRef.current({ kind: "line", line: l });
+              else placeLine(l);
+              changeMode("none");
             }}
+            clickSession={clickSession}
             onLoadedMetadata={onMeta}
+            onFrame={(index, time) => setFrame({ index, time })}
             onError={(e) => setError(e.message)}
             videoRef={videoRef}
           />
@@ -256,14 +441,51 @@ export function Lab({ samples }: { samples: SampleInfo[] }) {
             </button>
             <span className="muted">
               {meta ? `${meta.width}×${meta.height}, ${meta.numFrames} frames, ${meta.fps.toFixed(1)} fps` : "Loading…"}
+              {frame && (
+                <span className="frame-readout" data-frame={frame.index}>
+                  {" "}
+                  · frame {frame.index}, {frame.time.toFixed(3)} s
+                </span>
+              )}
             </span>
           </div>
+          {loaded.credit && (
+            <p className="muted credit">
+              {loaded.creditUrl ? <a href={loaded.creditUrl}>{loaded.credit}</a> : loaded.credit}
+            </p>
+          )}
         </section>
       )}
 
+      <AgentPanel
+        key={loadKey}
+        ready={Boolean(loaded && meta)}
+        running={agentRunning}
+        events={agentEvents}
+        question={question}
+        defaultNote={loaded?.note ?? ""}
+        usage={usage}
+        onStart={(note) => void startAgent(note)}
+        onStop={() => agentAbort.current?.abort()}
+        onAnswer={(text) => {
+          const nums = text.match(/-?\d+(?:\.\d+)?/g)?.map(Number) ?? [];
+          // Keyboard alternative to clicking: "x, y" for a point, "x1, y1, x2, y2" for a line.
+          if (question?.answerType === "click_point" && nums.length === 2) {
+            answerRef.current?.({ kind: "point", p: { x: nums[0]!, y: nums[1]! } });
+          } else if (question?.answerType === "click_line" && nums.length === 4) {
+            answerRef.current?.({
+              kind: "line",
+              line: { a: { x: nums[0]!, y: nums[1]! }, b: { x: nums[2]!, y: nums[3]! } },
+            });
+          } else answerRef.current?.({ kind: "text", text });
+        }}
+      />
+
       {loaded && (
         <section className="panel">
-          <h2>2. Track</h2>
+          <h2>
+            2. Track <small>(or do it by hand)</small>
+          </h2>
           <form
             className="row"
             onSubmit={(e) => {
@@ -278,7 +500,7 @@ export function Lab({ samples }: { samples: SampleInfo[] }) {
               maxLength={60}
               onChange={(e) => setPhrase(e.target.value)}
             />
-            <button type="submit" disabled={!meta || !phrase.trim() || tracking !== undefined}>
+            <button type="submit" disabled={!meta || !phrase.trim() || tracking !== undefined || agentRunning}>
               {tracking ? `Tracking… ${tracking.frames}/${total}` : "Track with SAM 3.1"}
             </button>
           </form>
@@ -363,7 +585,7 @@ export function Lab({ samples }: { samples: SampleInfo[] }) {
                   <button
                     type="button"
                     className={mode === "pivot" ? "on" : ""}
-                    onClick={() => setMode(mode === "pivot" ? "none" : "pivot")}
+                    onClick={() => changeMode(mode === "pivot" ? "none" : "pivot")}
                   >
                     {mode === "pivot"
                       ? "Click the pivot on the video…"
@@ -387,7 +609,7 @@ export function Lab({ samples }: { samples: SampleInfo[] }) {
               <button
                 type="button"
                 className={mode === "line" ? "on" : ""}
-                onClick={() => setMode(mode === "line" ? "none" : "line")}
+                onClick={() => changeMode(mode === "line" ? "none" : "line")}
               >
                 {mode === "line"
                   ? "Click both ends…"
@@ -398,10 +620,17 @@ export function Lab({ samples }: { samples: SampleInfo[] }) {
             </div>
             <label className="field">
               Its real length (m)
-              <input inputMode="decimal" value={refLength} onChange={(e) => setRefLength(e.target.value)} />
+              <input
+                inputMode="decimal"
+                value={refLength}
+                onChange={(e) => {
+                  setRefLength(e.target.value);
+                  setAnalysis(undefined);
+                }}
+              />
             </label>
           </div>
-          <button type="button" className="primary" onClick={analyse}>
+          <button type="button" className="primary" onClick={analyse} disabled={agentRunning}>
             Analyse
           </button>
         </section>

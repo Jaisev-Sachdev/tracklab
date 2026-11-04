@@ -23,7 +23,10 @@
     "spike:spark": "tsx --env-file-if-exists=.env.local scripts/spike/spark.ts",
     "spike:sam-image": "tsx --env-file-if-exists=.env.local scripts/spike/sam-image.ts",
     "spike:masks": "tsx scripts/spike/masks.ts",
-    "cache:sample": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/cache-sample.ts"
+    "cache:sample": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/cache-sample.ts",
+    "bench:render": "tsx scripts/bench/render.ts",
+    "bench:run": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/bench/run.ts",
+    "analyse:cached": "tsx --conditions=react-server scripts/analyse-cached.ts"
   },
   "devDependencies": {
     "@types/node": "24.19.2",

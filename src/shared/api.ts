@@ -98,6 +98,8 @@ export type SampleInfo = {
   id: string;
   title: string;
   description: string;
+  credit: string;
+  creditUrl?: string;
   video: string;
   /** Concept prompts with saved SAM output, which replay without a demo code. */
   cachedPrompts: string[];

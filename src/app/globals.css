@@ -324,3 +324,144 @@ table.coverage {
     margin-bottom: 0.4rem;
   }
 }
+
+textarea {
+  font: inherit;
+  color: inherit;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.45rem 0.6rem;
+  resize: vertical;
+}
+
+.agent .timeline {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0 0 0 0.9rem;
+  border-left: 2px solid var(--line);
+  display: grid;
+  gap: 0.45rem;
+}
+
+.timeline .say {
+  font-weight: 500;
+}
+
+.timeline .call {
+  color: var(--muted);
+}
+
+.timeline .call::before {
+  content: "→ ";
+}
+
+.timeline .result summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.timeline pre {
+  white-space: pre-wrap;
+  font-size: 0.8rem;
+  background: var(--bg);
+  padding: 0.5rem;
+  border-radius: 6px;
+  max-height: 16rem;
+  overflow: auto;
+}
+
+.error-text,
+.timeline .error-text summary {
+  color: var(--bad);
+}
+
+.thumbs {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.thumbs img {
+  width: 8.5rem;
+  height: auto;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+}
+
+.question {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+}
+
+.question p {
+  margin: 0 0 0.5rem;
+}
+
+button.link {
+  background: none;
+  border: none;
+  padding: 0.3rem 0;
+  color: var(--muted);
+  text-decoration: underline;
+}
+
+.report {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: var(--radius);
+  background: var(--bg);
+  border: 1px solid var(--line);
+}
+
+.report p {
+  margin: 0 0 0.6rem;
+}
+
+.usage {
+  margin: 0.75rem 0 0;
+}
+
+.spinner {
+  width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 50%;
+  border: 2px solid var(--line);
+  border-top-color: var(--accent);
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+  }
+}
+
+.unverified {
+  font-size: 0.85rem;
+  color: var(--warn);
+  margin-bottom: 0;
+}
+
+.frame-readout {
+  font-variant-numeric: tabular-nums;
+}
+
+.credit {
+  margin: 0.5rem 0 0;
+  font-size: 0.8rem;
+}
+
+.credit a {
+  color: inherit;
+}

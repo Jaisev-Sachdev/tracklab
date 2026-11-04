@@ -4,3 +4,5 @@ node_modules/
 spike-out/
 *.tsbuildinfo
 next-env.d.ts
+footage-src/
+bench-out/

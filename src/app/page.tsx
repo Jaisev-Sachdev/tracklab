@@ -7,6 +7,8 @@ export default function Home() {
     id: s.id,
     title: s.title,
     description: s.description,
+    credit: s.credit,
+    creditUrl: s.creditUrl,
     video: s.video,
     cachedPrompts: Object.keys(s.cached)
       .filter((k) => k.startsWith("concept:"))

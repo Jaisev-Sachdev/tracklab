@@ -143,3 +143,17 @@ describe("analysePendulum", () => {
     expect(Math.abs(r.periodS.value - tr.pendulum.periodS)).toBeLessThan(0.002);
   });
 });
+
+describe("uncertainty budget", () => {
+  it("says what limits g: the scale line here, not the period", async () => {
+    const tr = truth();
+    const { records } = await parseVideoText(fixture("sam-pendulum-synthetic.txt"));
+    const frameTimes = Array.from({ length: 300 }, (_, i) => i / tr.fps);
+    const [track] = tracksFromRecords(records, { frameTimes, width: 1280, height: 720 });
+    const r = analysePendulum(track!, { pivot: tr.pendulum.pivot, calibration: { pxPerM: 800, pxPerMSe: 4.5 } });
+    const b = r.uncertaintyBudget!;
+    expect(b.scaleLine! + b.pivotAndTracking! + b.period!).toBeCloseTo(1, 9);
+    expect(b.scaleLine).toBeGreaterThan(0.5);
+    expect(b.period).toBeLessThan(0.01);
+  });
+});

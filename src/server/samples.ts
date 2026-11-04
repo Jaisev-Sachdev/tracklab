@@ -9,6 +9,9 @@ const Sample = z.object({
   id: z.string(),
   title: z.string(),
   description: z.string(),
+  /** Attribution shown with the video (required for licensed footage). */
+  credit: z.string(),
+  creditUrl: z.url().optional(),
   /** Path under public/, served as-is. */
   video: z.string().startsWith("/samples/"),
   width: z.number().int().positive(),
