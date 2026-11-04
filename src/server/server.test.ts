@@ -48,7 +48,7 @@ describe("video sources", () => {
     expect(canServeToMeta("https://tracklab-git-x.vercel.app")).toBe(false);
   });
 
-  it("accepts only files uploaded to our own Blob store", () => {
+  it("accepts only files uploaded to our own Blob store", async () => {
     const ours = "https://abc123.public.blob.vercel-storage.com/uploads/a-x1y2.mp4";
     expect(isOurUpload(ours)).toBe(false); // no store configured
     setEnv({ BLOB_PUBLIC_HOST: "abc123.public.blob.vercel-storage.com" });
@@ -56,9 +56,11 @@ describe("video sources", () => {
     expect(isOurUpload("https://other9.public.blob.vercel-storage.com/uploads/a.mp4")).toBe(false);
     expect(isOurUpload("https://abc123.public.blob.vercel-storage.com/elsewhere/a.mp4")).toBe(false);
     expect(isOurUpload(ours + "?x=1")).toBe(false);
-    expect(() =>
+    await expect(
       videoInput({ kind: "blob", url: "https://evil.example.com/uploads/a.mp4" }, "https://x.app"),
-    ).toThrow();
+    ).rejects.toThrow(/uploaded through Tracklab/);
+    // The configured host is used as is, without probing the store.
+    expect((await videoInput({ kind: "blob", url: ours }, "https://x.app")).video_url).toBe(ours);
   });
 
   it("reads a video's length and refuses videos over the limit", async () => {
@@ -69,13 +71,13 @@ describe("video sources", () => {
     await expect(checkVideoLength("data:video/mp4;base64,AAAA")).rejects.toThrow(/Couldn't read/);
   });
 
-  it("sends a sample by URL when deployed and inline when local", () => {
+  it("sends a sample by URL when deployed and inline when local", async () => {
     const sample = { kind: "sample", id: "pendulum-synthetic" } as const;
-    expect(videoInput(sample, "https://tracklab.vercel.app").video_url).toBe(
+    expect((await videoInput(sample, "https://tracklab.vercel.app")).video_url).toBe(
       "https://tracklab.vercel.app/samples/pendulum-synthetic.mp4",
     );
-    expect(videoInput(sample, "http://localhost:3000").video_url).toMatch(/^data:video\/mp4;base64,AAAA/);
-    expect(() => videoInput({ kind: "sample", id: "nope" }, "http://localhost:3000")).toThrow(/Unknown sample/);
+    expect((await videoInput(sample, "http://localhost:3000")).video_url).toMatch(/^data:video\/mp4;base64,AAAA/);
+    await expect(videoInput({ kind: "sample", id: "nope" }, "http://localhost:3000")).rejects.toThrow(/Unknown sample/);
   });
 
   it("puts the prompt text before the media, as SAM expects", () => {

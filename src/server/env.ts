@@ -18,6 +18,8 @@ const Env = z.object({
     .string()
     .regex(/^[a-z0-9]+\.public\.blob\.vercel-storage\.com$/)
     .optional(),
+  /** Set by Vercel when a Blob store is connected; used to issue upload tokens and to learn the store host. */
+  BLOB_READ_WRITE_TOKEN: z.string().optional(),
   /** Longest video SAM will be asked to track, in seconds. SAM bills per frame. */
   MAX_VIDEO_SECONDS: z.coerce.number().positive().default(60),
 });

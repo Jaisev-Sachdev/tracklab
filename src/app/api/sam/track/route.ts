@@ -29,7 +29,7 @@ export async function POST(request: Request): Promise<Response> {
 
   let media;
   try {
-    media = videoInput(video, new URL(request.url).origin);
+    media = await videoInput(video, new URL(request.url).origin);
     // Bundled samples are short and trusted; uploads are checked before SAM bills for every frame.
     if (video.kind === "blob") await checkVideoLength(video.url);
   } catch (err) {

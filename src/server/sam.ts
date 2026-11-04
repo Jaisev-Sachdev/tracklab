@@ -27,16 +27,44 @@ export function canServeToMeta(origin: string): boolean {
 }
 
 /** Only files uploaded through Tracklab (our Blob store, under uploads/) can be tracked. */
-export function isOurUpload(raw: string): boolean {
-  const host = env().BLOB_PUBLIC_HOST;
+export function isOurUpload(raw: string, host = env().BLOB_PUBLIC_HOST): boolean {
   if (!host) return false;
   const url = new URL(raw);
   return url.protocol === "https:" && url.hostname === host && url.pathname.startsWith("/uploads/") && !url.search;
 }
 
-export function videoInput(video: VideoSource, origin: string): { type: "input_video"; video_url: string } {
+let probedHost: Promise<string | undefined> | undefined;
+
+/**
+ * This project's Blob store hostname: BLOB_PUBLIC_HOST if set, otherwise learned once by writing a tiny probe file
+ * with the store's own token (Vercel sets BLOB_READ_WRITE_TOKEN when a store is connected), so deploying needs no
+ * hand-copied hostname.
+ */
+export function blobPublicHost(): Promise<string | undefined> {
+  const { BLOB_PUBLIC_HOST, BLOB_READ_WRITE_TOKEN } = env();
+  if (BLOB_PUBLIC_HOST) return Promise.resolve(BLOB_PUBLIC_HOST);
+  if (!BLOB_READ_WRITE_TOKEN) return Promise.resolve(undefined);
+  probedHost ??= import("@vercel/blob")
+    .then(({ put }) =>
+      put("uploads/.tracklab-probe.txt", "probe", { access: "public", addRandomSuffix: false, allowOverwrite: true }),
+    )
+    .then((blob) => new URL(blob.url).hostname)
+    .catch((err: unknown) => {
+      console.error("Couldn't learn the Blob store host", err);
+      probedHost = undefined;
+      return undefined;
+    });
+  return probedHost;
+}
+
+export async function videoInput(
+  video: VideoSource,
+  origin: string,
+): Promise<{ type: "input_video"; video_url: string }> {
   if (video.kind === "blob") {
-    if (!isOurUpload(video.url)) throw new BadVideoError("Videos must be uploaded through Tracklab.");
+    if (!isOurUpload(video.url, await blobPublicHost())) {
+      throw new BadVideoError("Videos must be uploaded through Tracklab.");
+    }
     return { type: "input_video", video_url: video.url };
   }
   const sample = findSample(video.id);
