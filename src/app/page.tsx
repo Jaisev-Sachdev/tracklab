@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { Lab } from "@/client/components/Lab";
+import { Logo } from "@/client/components/Logo";
 import type { SampleInfo } from "@/shared/api";
 import { env } from "@/server/env";
 import { samples } from "@/server/samples";
@@ -21,8 +22,18 @@ export default function Home() {
   return (
     <>
       <header className="masthead">
-        <h1>Tracklab</h1>
-        <p>Film a physics experiment. SAM 3.1 tracks it frame by frame; the fits measure it, with honest error bars.</p>
+        <div className="brand">
+          <Logo size={46} />
+          <h1>tracklab</h1>
+        </div>
+        <p className="tagline">
+          Film an experiment. Get a <em>measurement</em> you can trust.
+        </p>
+        <ul className="stack" aria-label="How it works">
+          <li>SAM 3.1 tracks every frame</li>
+          <li>Muse Spark runs the lab</li>
+          <li>fits with honest error bars</li>
+        </ul>
       </header>
       <Lab samples={list} uploadMode={env().BLOB_READ_WRITE_TOKEN ? "token" : "presigned"} />
     </>

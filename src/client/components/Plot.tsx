@@ -76,7 +76,8 @@ export function Plot({ series, xLabel, yLabel, marker }: Props) {
               key={s.label}
               fill="none"
               stroke={s.color}
-              strokeWidth={1.25}
+              style={{ color: s.color }}
+              strokeWidth={1.6}
               opacity={0.85}
               points={s.points.map((p) => `${sx(p.x)},${sy(p.y)}`).join(" ")}
             />

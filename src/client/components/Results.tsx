@@ -48,7 +48,7 @@ export function PendulumResults({ r }: { r: PendulumResult }) {
       style: "dots",
       points: r.series.t.map((t, i) => ({ x: t, y: deg(r.series.theta[i]!) })),
     },
-    { label: "fit", color: "var(--accent)", style: "line", points: fitPoints },
+    { label: "fit", color: "var(--fg)", style: "line", points: fitPoints },
   ];
   return (
     <section className="results">

@@ -444,7 +444,9 @@ export function Lab({ samples, uploadMode }: { samples: SampleInfo[]; uploadMode
     <div className="lab">
       <div className="lab-col lab-left">
         <section className="panel sources">
-          <h2>1. Video</h2>
+          <h2>
+            <span className="step">01</span> Video
+          </h2>
           <div className="row wrap">
             {samples.map((s) => (
               <button
@@ -579,7 +581,7 @@ export function Lab({ samples, uploadMode }: { samples: SampleInfo[]; uploadMode
         {loaded && (
           <section className="panel">
             <h2>
-              2. Track <small>(or do it by hand)</small>
+              <span className="step">03</span> Track <small>by hand, or let the lab partner do it</small>
             </h2>
             <form
               className="row"
@@ -633,7 +635,9 @@ export function Lab({ samples, uploadMode }: { samples: SampleInfo[]; uploadMode
 
         {tracks.length > 0 && (
           <section className="panel">
-            <h2>3. Measure</h2>
+            <h2>
+              <span className="step">04</span> Measure
+            </h2>
             <div className="row">
               <label>
                 <input type="radio" checked={experiment === "pendulum"} onChange={() => setExperiment("pendulum")} />{" "}

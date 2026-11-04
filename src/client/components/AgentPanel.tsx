@@ -92,7 +92,9 @@ export function AgentPanel({
 
   return (
     <section className="panel agent">
-      <h2>Lab partner · Muse Spark</h2>
+      <h2>
+        <span className="step">02</span> Lab partner <small>Muse Spark</small>
+      </h2>
       {!running && (
         <div className="field">
           <label htmlFor="agent-note">

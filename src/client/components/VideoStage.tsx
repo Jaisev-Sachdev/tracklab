@@ -165,6 +165,7 @@ export function VideoStage({
         onFrame={({ frameIndex, time }) => onFrame(frameIndex, time)}
         onError={onError}
       />
+      <div className="viewfinder" aria-hidden="true" />
       <canvas
         ref={canvas}
         className={mode === "none" ? "overlay" : "overlay picking"}
