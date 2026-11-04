@@ -170,6 +170,16 @@ describe("report checks", () => {
     const evidence = ['{"g": "9.799 ± 0.067 m/s²", "sigma": 0.17}'];
     expect(unverifiedNumbers(r, evidence)).toEqual(["1.234"]);
   });
+
+  it("accepts roundings of measured numbers but not the model's own arithmetic", () => {
+    const r = parseReport({
+      headline: "g = 9.48 ± 0.04 m/s²",
+      summary: "s",
+      comparison: "8.7 standard errors low; 1.7 cm longer",
+    })!;
+    const evidence = ['{"g": "9.480 ± 0.038 m/s²", "sigma": -8.69, "length_that_would_give_9_81_m": 0.5174}'];
+    expect(unverifiedNumbers(r, evidence)).toEqual(["1.7"]);
+  });
 });
 
 describe("pruneImages", () => {

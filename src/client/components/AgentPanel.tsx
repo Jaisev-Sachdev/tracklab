@@ -14,6 +14,10 @@ type Props = {
   onStart: (note: string) => void;
   onStop: () => void;
   onAnswer: (text: string) => void;
+  /** A recorded run for this sample: watch it without a demo code. `recordedAt` is set while one is shown. */
+  replay?: { onPlay: () => void; recordedAt?: string };
+  /** Development only: save the finished run as this sample's recording. */
+  onSave?: () => void;
 };
 
 const TOOL_LABELS: Record<string, string> = {
@@ -66,7 +70,19 @@ function Report({ r }: { r: FinishReport }) {
   );
 }
 
-export function AgentPanel({ ready, running, events, question, defaultNote, usage, onStart, onStop, onAnswer }: Props) {
+export function AgentPanel({
+  ready,
+  running,
+  events,
+  question,
+  defaultNote,
+  usage,
+  onStart,
+  onStop,
+  onAnswer,
+  replay,
+  onSave,
+}: Props) {
   const [note, setNote] = useState<string | undefined>();
   const [answer, setAnswer] = useState("");
   const done = events.findLast((e) => e.kind === "done");
@@ -87,6 +103,11 @@ export function AgentPanel({ ready, running, events, question, defaultNote, usag
             <button type="button" className="primary" disabled={!ready} onClick={() => onStart(note ?? defaultNote)}>
               {events.length > 0 ? "Run again" : "Analyse with the lab partner"}
             </button>
+            {replay && (
+              <button type="button" onClick={replay.onPlay}>
+                Watch a recorded run
+              </button>
+            )}
             {!ready && <span className="muted">Load a video first.</span>}
           </div>
         </div>
@@ -100,6 +121,11 @@ export function AgentPanel({ ready, running, events, question, defaultNote, usag
         </div>
       )}
 
+      {replay?.recordedAt && (
+        <p className="muted replay-note">
+          Recorded run from {new Date(replay.recordedAt).toLocaleDateString()}, replayed with no live calls.
+        </p>
+      )}
       {events.length > 0 && (
         <ol className="timeline" aria-live="polite">
           {events.map((e, i) => {
@@ -186,6 +212,11 @@ export function AgentPanel({ ready, running, events, question, defaultNote, usag
 
       {done?.kind === "done" && done.report && <Report r={done.report} />}
       {done?.kind === "done" && !done.report && <p className="muted">{done.reason}</p>}
+      {done?.kind === "done" && done.report && !running && onSave && (
+        <button type="button" onClick={onSave}>
+          Save as this sample&apos;s recorded run (dev only)
+        </button>
+      )}
       {(usage.inputTokens > 0 || usage.samFrames > 0) && (
         <p className="muted usage">
           Muse Spark {usage.inputTokens.toLocaleString()} in / {usage.outputTokens.toLocaleString()} out tokens · SAM{" "}

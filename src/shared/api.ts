@@ -103,6 +103,8 @@ export type SampleInfo = {
   video: string;
   /** Concept prompts with saved SAM output, which replay without a demo code. */
   cachedPrompts: string[];
+  /** A recorded lab-partner run exists at /replays/<id>.json. */
+  hasReplay: boolean;
 };
 
 /** Header carrying the demo code that unlocks live (billed) calls. */

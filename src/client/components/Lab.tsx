@@ -9,7 +9,8 @@ import { analyseCollision, type CollisionResult } from "@/domain/physics/collisi
 import { analysePendulum, type PendulumResult } from "@/domain/physics/pendulum";
 import { coverage, tracksFromRecords, type Track } from "@/domain/track/track";
 import type { SamPrompt, SampleInfo, VideoSource } from "@/shared/api";
-import { runAgent, type AgentEvent } from "../agent/runner";
+import { buildReplay, dwellMs, type Replay } from "../agent/replay";
+import { runAgent, unverifiedNumbers, type AgentEvent } from "../agent/runner";
 import { nearestFrame } from "../agent/frames";
 import { makeTools, type Answer, type LabContext, type Question } from "../agent/tools";
 import { agentStep, trackVideo, uploadVideo } from "../api";
@@ -58,6 +59,8 @@ export function Lab({ samples }: { samples: SampleInfo[] }) {
   const [agentEvents, setAgentEvents] = useState<AgentEvent[]>([]);
   const [agentRunning, setAgentRunning] = useState(false);
   const [question, setQuestion] = useState<Question>();
+  const [replayedAt, setReplayedAt] = useState<string>();
+  const [lastNote, setLastNote] = useState("");
   const [usage, setUsage] = useState({ inputTokens: 0, outputTokens: 0, samFrames: 0, samImages: 0 });
   // Bumped on every video change, so per-video UI (the agent note, a half-drawn line) starts fresh.
   const [loadKey, setLoadKey] = useState(0);
@@ -77,6 +80,7 @@ export function Lab({ samples }: { samples: SampleInfo[] }) {
     abort.current?.abort();
     agentAbort.current?.abort();
     setAgentEvents([]);
+    setReplayedAt(undefined);
     setUsage({ inputTokens: 0, outputTokens: 0, samFrames: 0, samImages: 0 });
     setLoadKey((k) => k + 1);
     setLoaded(next);
@@ -221,6 +225,8 @@ export function Lab({ samples }: { samples: SampleInfo[] }) {
     agentAbort.current = ctrl;
     const isCurrent = () => agentAbort.current === ctrl;
     setAgentEvents([]);
+    setReplayedAt(undefined);
+    setLastNote(note);
     setAgentRunning(true);
     setError(undefined);
 
@@ -307,6 +313,79 @@ export function Lab({ samples }: { samples: SampleInfo[] }) {
     } finally {
       if (isCurrent()) setAgentRunning(false);
     }
+  }
+
+  /** Play a recorded run: the same timeline, with the lab state its tools set applied as they happened. */
+  async function playReplay() {
+    const current = live.current.loaded;
+    if (!current || current.source.kind !== "sample") return;
+    const sampleId = current.source.id;
+    agentAbort.current?.abort();
+    const ctrl = new AbortController();
+    agentAbort.current = ctrl;
+    const isCurrent = () => agentAbort.current === ctrl && !ctrl.signal.aborted;
+    setError(undefined);
+    setAgentEvents([]);
+    setAnalysis(undefined);
+    setAgentRunning(true);
+    try {
+      const res = await fetch(`/replays/${sampleId}.json`, { signal: ctrl.signal });
+      if (!res.ok) throw new Error("No recorded run for this video.");
+      const rep = (await res.json()) as Replay;
+      setReplayedAt(rep.recordedAt);
+      for (const e of rep.events) {
+        if (!isCurrent()) return;
+        if (e.kind === "result" && !e.error) {
+          if (e.name === "track" || e.name === "track_boxes") {
+            live.current.tracks = rep.tracks;
+            setTracks(rep.tracks);
+            setObjectA(rep.tracks[0]?.objectId ?? "");
+            setObjectB(rep.tracks[1]?.objectId ?? "");
+          }
+          if (e.name === "set_pivot" && rep.pivot) placePivot(rep.pivot);
+          if (e.name === "set_calibration" && rep.line) placeLine(rep.line, Number(rep.refLength));
+          if ((e.name === "analyse_pendulum" || e.name === "analyse_collision") && rep.analysis) {
+            setExperiment(rep.analysis.kind);
+            setAnalysis(rep.analysis);
+          }
+        }
+        setAgentEvents((list) => [...list, e]);
+        await new Promise((r) => setTimeout(r, dwellMs(e)));
+      }
+      if (isCurrent()) setUsage(rep.usage);
+    } catch (e) {
+      if (isCurrent()) setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      if (agentAbort.current === ctrl) setAgentRunning(false);
+    }
+  }
+
+  /** Development only: save the run just finished as this sample's recorded run. */
+  async function saveReplay() {
+    const current = live.current.loaded;
+    if (!current || current.source.kind !== "sample") return;
+    // Re-check the report's numbers against what the tools returned (the check may have improved since the run).
+    const evidence = [lastNote, ...agentEvents.flatMap((e) => (e.kind === "result" && !e.error ? [e.text] : []))];
+    const events = agentEvents.map((e) =>
+      e.kind === "done" && e.report
+        ? { ...e, report: { ...e.report, unverifiedNumbers: unverifiedNumbers(e.report, evidence) } }
+        : e,
+    );
+    const replay = await buildReplay({
+      sampleId: current.source.id,
+      note: lastNote,
+      events,
+      tracks: live.current.tracks,
+      pivot: live.current.pivot,
+      line: live.current.line,
+      refLength: live.current.refLength,
+      analysis,
+      usage,
+    });
+    const res = await fetch("/api/dev/replay", { method: "POST", body: JSON.stringify(replay) });
+    const out = (await res.json()) as { saved?: string; error?: string };
+    setError(out.saved ? undefined : (out.error ?? "Couldn't save the replay."));
+    if (out.saved) console.info(`Saved ${out.saved}`);
   }
 
   const calibration = useMemo(() => {
@@ -467,6 +546,17 @@ export function Lab({ samples }: { samples: SampleInfo[] }) {
         usage={usage}
         onStart={(note) => void startAgent(note)}
         onStop={() => agentAbort.current?.abort()}
+        replay={
+          loaded?.source.kind === "sample" &&
+          samples.find((x) => x.id === (loaded.source as { id: string }).id)?.hasReplay
+            ? { onPlay: () => void playReplay(), recordedAt: replayedAt }
+            : undefined
+        }
+        onSave={
+          process.env.NODE_ENV === "development" && loaded?.source.kind === "sample" && !replayedAt
+            ? () => void saveReplay()
+            : undefined
+        }
         onAnswer={(text) => {
           const nums = text.match(/-?\d+(?:\.\d+)?/g)?.map(Number) ?? [];
           // Keyboard alternative to clicking: "x, y" for a point, "x1, y1, x2, y2" for a line.

@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
 import { Lab } from "@/client/components/Lab";
 import type { SampleInfo } from "@/shared/api";
 import { samples } from "@/server/samples";
@@ -10,6 +12,7 @@ export default function Home() {
     credit: s.credit,
     creditUrl: s.creditUrl,
     video: s.video,
+    hasReplay: existsSync(path.join(process.cwd(), "public", "replays", `${s.id}.json`)),
     cachedPrompts: Object.keys(s.cached)
       .filter((k) => k.startsWith("concept:"))
       .map((k) => k.slice("concept:".length)),

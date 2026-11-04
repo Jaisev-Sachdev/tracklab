@@ -188,3 +188,15 @@ runs "red ball" found nothing on video and the agent recovered (another phrase, 
 **Consequence:** The source downloads (`footage-src/`) and rendered clips (`bench-out/`) are git-ignored and
 reproducible from the scripts. The agent's instructions now cap phrase guessing (two `track`, one `locate`) before
 asking for a click, and explain the stated-length pitfall.
+
+## D-013 Recorded lab-partner runs for visitors without a demo code (2026-11-04)
+
+**Context:** Judges and other visitors without a code should still see the agent work, without billing live calls.
+**Decision:** A finished run on a bundled sample can be saved (development only, via `/api/dev/replay`, which answers
+404 in production) to `public/replays/<sample>.json`: the timeline with thumbnails shrunk to 320 px, the tracks,
+pivot, scale and analysis the tools set, and the run's cost. "Watch a recorded run" plays it back at a readable pace,
+applying the state as the original tools did; it makes no API calls. The unverified-numbers check now accepts
+roundings of measured numbers (9.480 → 9.48) and is recomputed when a run is saved.
+**Consequence:** Three recorded runs, 60–75 KB each: synthetic pendulum (g = 9.799 ± 0.067), synthetic collision
+(ratio 0.997 ± 0.012) and the real classroom pendulum (g = 9.480 ± 0.038 with the knot diagnosis; "1.7" flagged as
+the agent's own arithmetic). Playback shows trails, not SAM's masks, since masks aren't stored.

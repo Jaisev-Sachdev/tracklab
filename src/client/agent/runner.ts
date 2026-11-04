@@ -43,10 +43,15 @@ export function parseReport(args: Record<string, unknown>): FinishReport | undef
  * code, so anything else is shown to the person as unverified rather than silently trusted.
  */
 export function unverifiedNumbers(report: FinishReport, evidence: readonly string[]): string[] {
-  const known = new Set(evidence.join("\n").match(/\d+\.\d+/g) ?? []);
-  known.add("9.81");
+  const known = [...(evidence.join("\n").match(/\d+(?:\.\d+)?/g) ?? []).map(Number), 9.81];
+  // A stated number counts as measured if some measured number rounds to it at the stated precision (9.480 → 9.48).
+  const matches = (s: string) => {
+    const decimals = s.split(".")[1]?.length ?? 0;
+    const v = Number(s);
+    return known.some((k) => Math.abs(Number(k.toFixed(decimals)) - v) < 1e-9);
+  };
   const stated = `${report.headline}\n${report.comparison}`.match(/\d+\.\d+/g) ?? [];
-  return [...new Set(stated.filter((n) => !known.has(n)))];
+  return [...new Set(stated.filter((n) => !matches(n)))];
 }
 
 export type AgentEvent =
